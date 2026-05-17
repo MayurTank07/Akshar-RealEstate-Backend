@@ -1,0 +1,27 @@
+export const PERMISSIONS = {
+  DASHBOARD_ACCESS: "dashboard:access",
+  ENQUIRIES_VIEW: "enquiries:view",
+  PROPERTIES_ADD: "properties:add",
+  PROPERTIES_EDIT: "properties:edit",
+  PROPERTIES_DELETE: "properties:delete",
+  LEADS_MANAGE: "leads:manage",
+  PROPERTIES_STATUS: "properties:status",
+  ANALYTICS_ACCESS: "analytics:access",
+  REPORTS_EXPORT: "reports:export",
+  SAVED_MANAGE: "saved:manage",
+  CLIENTS_MANAGE: "clients:manage",
+  ASSIGNED_VIEW: "assigned:view",
+};
+
+export const ALL_PERMISSION_VALUES = Object.values(PERMISSIONS);
+
+export const DEFAULT_SUPERVISOR_PERMISSIONS = [
+  PERMISSIONS.DASHBOARD_ACCESS,
+  PERMISSIONS.ENQUIRIES_VIEW,
+  PERMISSIONS.PROPERTIES_ADD,
+  PERMISSIONS.PROPERTIES_EDIT,
+  PERMISSIONS.LEADS_MANAGE,
+  PERMISSIONS.PROPERTIES_STATUS,
+  PERMISSIONS.ANALYTICS_ACCESS,
+  PERMISSIONS.ASSIGNED_VIEW,
+];
