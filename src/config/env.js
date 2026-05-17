@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const required = ["MONGODB_URI", "JWT_SECRET"];
+const defaultCorsOrigins = ["http://127.0.0.1:5173", "http://localhost:5173", "https://akshar-real-estate.vercel.app"];
 
 for (const key of required) {
   if (!process.env[key]) {
@@ -21,8 +22,5 @@ export const env = {
     apiKey: process.env.CLOUDINARY_API_KEY || "",
     apiSecret: process.env.CLOUDINARY_API_SECRET || "",
   },
-  corsOrigins: (process.env.CORS_ORIGIN || "http://127.0.0.1:5173,http://localhost:5173")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean),
+  corsOrigins: [...new Set([...(process.env.CORS_ORIGIN || "").split(","), ...defaultCorsOrigins].map((origin) => origin.trim()).filter(Boolean))],
 };

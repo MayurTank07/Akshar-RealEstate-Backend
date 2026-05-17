@@ -25,6 +25,10 @@ function canAccessProperty(user, property) {
   return [property.assignedTo, property.createdBy].some((id) => id && id.toString() === user._id.toString());
 }
 
+function activityTargets(...ids) {
+  return [...new Set(ids.filter(Boolean).map((id) => id.toString()))];
+}
+
 export const publicProperties = asyncHandler(async (req, res) => {
   const filter = listQuery({ ...req.query, status: req.query.status || "active" });
   filter.visibility = { $ne: "private" };
@@ -68,6 +72,7 @@ export const createProperty = asyncHandler(async (req, res) => {
     description: `${property.title} added`,
     actorName: req.user.name,
     actorId: req.user._id,
+    targetStaffIds: activityTargets(property.assignedTo, property.createdBy),
   });
   res.status(201).json({ success: true, data: property });
 });
@@ -76,6 +81,7 @@ export const updateProperty = asyncHandler(async (req, res) => {
   const existing = await Property.findById(req.validated.params.id);
   if (!existing) throw new ApiError(404, "Property not found");
   if (!canAccessProperty(req.user, existing)) throw new ApiError(403, "You can only update assigned properties");
+  const previousAssignedTo = existing.assignedTo?.toString();
 
   const body = { ...req.validated.body, updatedBy: req.user._id };
   if (req.user.role === "supervisor") {
@@ -86,10 +92,11 @@ export const updateProperty = asyncHandler(async (req, res) => {
   await existing.save();
   await Activity.create({
     type: "Property",
-    title: "Property updated",
+    title: previousAssignedTo !== existing.assignedTo?.toString() ? "Property assigned" : "Property updated",
     description: existing.title,
     actorName: req.user.name,
     actorId: req.user._id,
+    targetStaffIds: activityTargets(existing.assignedTo, existing.createdBy),
   });
   res.json({ success: true, data: existing });
 });
@@ -105,6 +112,7 @@ export const deleteProperty = asyncHandler(async (req, res) => {
     description: property.title,
     actorName: req.user.name,
     actorId: req.user._id,
+    targetStaffIds: activityTargets(property.assignedTo, property.createdBy),
   });
   res.json({ success: true, data: { id: property._id } });
 });

@@ -27,6 +27,10 @@ async function findEnquiryProperty(body) {
   return null;
 }
 
+function activityTargets(...ids) {
+  return [...new Set(ids.filter(Boolean).map((id) => id.toString()))];
+}
+
 export const createPublicEnquiry = asyncHandler(async (req, res) => {
   const body = normalizeEnquiry(req.validated.body);
   const property = await findEnquiryProperty(body);
@@ -45,6 +49,7 @@ export const createPublicEnquiry = asyncHandler(async (req, res) => {
     title: "New enquiry",
     description: enquiry.propertyTitle || enquiry.preferredLocation || "Website enquiry",
     actorName: enquiry.name,
+    targetStaffIds: activityTargets(enquiry.assignedTo),
   });
   res.status(201).json({ success: true, data: enquiry });
 });
@@ -82,6 +87,7 @@ export const updateEnquiry = asyncHandler(async (req, res) => {
     description: `${enquiry.name} marked ${enquiry.status}`,
     actorName: req.user.name,
     actorId: req.user._id,
+    targetStaffIds: activityTargets(enquiry.assignedTo),
   });
 
   res.json({ success: true, data: enquiry });

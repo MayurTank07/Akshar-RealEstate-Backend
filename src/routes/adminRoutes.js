@@ -2,6 +2,7 @@ import { Router } from "express";
 import { analytics, dashboard } from "../controllers/analyticsController.js";
 import { updateContent } from "../controllers/contentController.js";
 import { deleteEnquiry, listEnquiries, updateEnquiry } from "../controllers/enquiryController.js";
+import { listNotifications, markAllNotificationsRead, markNotificationRead } from "../controllers/notificationController.js";
 import { listOwners, updateOwnerStatus } from "../controllers/ownerController.js";
 import { createProperty, deleteProperty, getProperty, listProperties, updateProperty } from "../controllers/propertyController.js";
 import { exportReport } from "../controllers/reportController.js";
@@ -26,6 +27,9 @@ router.use(authenticate);
 
 router.get("/dashboard", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.DASHBOARD_ACCESS), dashboard);
 router.get("/analytics", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.ANALYTICS_ACCESS), analytics);
+router.get("/notifications", authorize("admin", "supervisor"), listNotifications);
+router.put("/notifications/read-all", authorize("admin", "supervisor"), markAllNotificationsRead);
+router.put("/notifications/:id/read", authorize("admin", "supervisor"), validate(idParamSchema), markNotificationRead);
 
 router.get("/properties", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.ASSIGNED_VIEW), listProperties);
 router.get("/properties/:id", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.ASSIGNED_VIEW), validate(idParamSchema), getProperty);
@@ -47,6 +51,6 @@ router.get("/owners", authorize("admin"), listOwners);
 router.put("/owners/:id/status", authorize("admin"), validate(idParamSchema), validate(ownerStatusSchema), updateOwnerStatus);
 
 router.put("/content/:id", authorize("admin"), validate(idParamSchema), validate(contentUpdateSchema), updateContent);
-router.get("/reports/export", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.REPORTS_EXPORT), exportReport);
+router.get("/reports/export", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.REPORTS_EXPORT, PERMISSIONS.ANALYTICS_ACCESS), exportReport);
 
 export default router;

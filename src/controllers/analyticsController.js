@@ -13,11 +13,39 @@ function enquiryScope(user) {
   return user.role === "admin" ? {} : { assignedTo: user._id };
 }
 
+function activityScope(user) {
+  if (user.role === "admin") return {};
+  return { $or: [{ actorId: user._id }, { targetStaffIds: user._id }] };
+}
+
+function parseCroreValue(price) {
+  const text = String(price || "").toLowerCase();
+  const value = Number.parseFloat(text.replace(/[^\d.]/g, "")) || 0;
+  if (!value) return 0;
+  if (text.includes("l") && !text.includes("cr")) return value / 100;
+  if (text.includes("k")) return value / 100000;
+  return value;
+}
+
+function formatCrores(value) {
+  return `₹${Number(value || 0).toFixed(value >= 10 ? 1 : 2).replace(/\.00$/, "")} Cr`;
+}
+
+function lastSevenDays() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (6 - index));
+    return date;
+  });
+}
+
 export const dashboard = asyncHandler(async (req, res) => {
   const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
   const properties = propertyScope(req.user);
   const enquiries = enquiryScope(req.user);
-  const activityFilter = req.user.role === "admin" ? {} : { actorId: req.user._id };
+  const activityFilter = activityScope(req.user);
   const [
     totalProperties,
     totalEnquiries,
@@ -104,8 +132,8 @@ export const dashboard = asyncHandler(async (req, res) => {
       },
       supervisorMode: req.user.role === "supervisor",
       quickStats: {
-        pendingApprovals: req.user.role === "admin" ? pendingOwners : 0,
-        activeSupervisors: req.user.role === "admin" ? activeSupervisors : 0,
+        pendingApprovals: req.user.role === "admin" ? pendingOwners : totalProperties,
+        activeSupervisors: req.user.role === "admin" ? activeSupervisors : activeListings,
         newEnquiriesToday: newToday,
       },
       recentActivity,
@@ -125,12 +153,79 @@ export const dashboard = asyncHandler(async (req, res) => {
 
 export const analytics = asyncHandler(async (req, res) => {
   const enquiries = enquiryScope(req.user);
-  const [totalLeads, closedLeads] = await Promise.all([
+  const properties = propertyScope(req.user);
+  const days = lastSevenDays();
+  const start = days[0];
+  const [
+    totalLeads,
+    closedLeads,
+    totalProperties,
+    activeListings,
+    soldRentedProperties,
+    weeklyStats,
+    sourceStats,
+    statusStats,
+    typeStats,
+    handledLeads,
+  ] = await Promise.all([
     Enquiry.countDocuments(enquiries),
     Enquiry.countDocuments({ ...enquiries, status: "closed" }),
+    Property.countDocuments(properties),
+    Property.countDocuments({ ...properties, status: "active" }),
+    Property.find({ ...properties, status: { $in: ["sold", "rented"] } }).select("price").lean(),
+    Enquiry.aggregate([
+      { $match: { ...enquiries, createdAt: { $gte: start } } },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: "%Y-%m-%d",
+              date: "$createdAt",
+              timezone: "Asia/Kolkata",
+            },
+          },
+          enquiries: { $sum: 1 },
+          conversions: { $sum: { $cond: [{ $eq: ["$status", "closed"] }, 1, 0] } },
+        },
+      },
+    ]),
+    Enquiry.aggregate([{ $match: enquiries }, { $group: { _id: "$source", value: { $sum: 1 } } }, { $sort: { value: -1 } }]),
+    Enquiry.aggregate([{ $match: enquiries }, { $group: { _id: "$status", value: { $sum: 1 } } }]),
+    Property.aggregate([{ $match: properties }, { $group: { _id: "$type", value: { $sum: 1 } } }, { $sort: { value: -1 } }]),
+    Enquiry.find({ ...enquiries, status: { $ne: "new" } }).select("createdAt updatedAt").lean(),
   ]);
 
   const conversionRate = totalLeads ? Number(((closedLeads / totalLeads) * 100).toFixed(1)) : 0;
+  const revenueGenerated = soldRentedProperties.reduce((sum, property) => sum + parseCroreValue(property.price), 0);
+  const avgResponseMs = handledLeads.length
+    ? handledLeads.reduce((sum, item) => sum + (new Date(item.updatedAt).getTime() - new Date(item.createdAt).getTime()), 0) / handledLeads.length
+    : 0;
+  const avgResponseTime = avgResponseMs ? `${Math.max(0.1, avgResponseMs / 1000 / 60 / 60).toFixed(1)} hrs` : "0 hrs";
+
+  const weeklyMap = new Map(weeklyStats.map((item) => [item._id, item]));
+  const weekly = days.map((date) => {
+    const key = date.toISOString().slice(0, 10);
+    const item = weeklyMap.get(key) || {};
+    return {
+      day: date.toLocaleDateString("en-US", { weekday: "short" }),
+      date: key,
+      enquiries: item.enquiries || 0,
+      conversions: item.conversions || 0,
+    };
+  });
+
+  const sourceLabels = {
+    website: "Website",
+    "property-detail": "Property Detail",
+    guest: "Guest Form",
+    admin: "Admin",
+  };
+  const sources = sourceStats.length
+    ? sourceStats.map((item) => ({ label: sourceLabels[item._id] || item._id || "Unknown", value: item.value }))
+    : [{ label: "No leads yet", value: 0 }];
+  const statusMap = new Map(statusStats.map((item) => [item._id, item.value]));
+  const inProgress = statusMap.get("in-progress") || 0;
+  const funnelMax = Math.max(totalProperties, totalLeads, inProgress, closedLeads, 1);
 
   res.json({
     success: true,
@@ -138,30 +233,20 @@ export const analytics = asyncHandler(async (req, res) => {
       cards: {
         totalLeads,
         conversionRate,
-        revenueGenerated: "₹45.2 Cr",
-        avgResponseTime: "2.4 hrs",
+        revenueGenerated: formatCrores(revenueGenerated),
+        avgResponseTime,
+        totalProperties,
+        activeListings,
+        soldRented: soldRentedProperties.length,
       },
-      weekly: [
-        { day: "Mon", enquiries: 45, conversions: 12 },
-        { day: "Tue", enquiries: 52, conversions: 15 },
-        { day: "Wed", enquiries: 48, conversions: 14 },
-        { day: "Thu", enquiries: 61, conversions: 20 },
-        { day: "Fri", enquiries: 55, conversions: 18 },
-        { day: "Sat", enquiries: 68, conversions: 24 },
-        { day: "Sun", enquiries: 43, conversions: 11 },
-      ],
-      sources: [
-        { label: "Website", value: 245 },
-        { label: "Social Media", value: 175 },
-        { label: "Referrals", value: 118 },
-        { label: "Direct", value: 91 },
-        { label: "Others", value: 58 },
-      ],
+      weekly,
+      sources,
+      propertyTypes: typeStats.map((item) => ({ label: item._id || "Unknown", value: item.value })),
       funnel: [
-        { label: "Website Visitors", value: 15420, percent: 100 },
-        { label: "Enquiries", value: totalLeads, percent: 32 },
-        { label: "Site Visits", value: Math.round(totalLeads * 0.42), percent: 18 },
-        { label: "Closed Clients", value: closedLeads, percent: conversionRate },
+        { label: "Assigned Properties", value: totalProperties, percent: (totalProperties / funnelMax) * 100 },
+        { label: "Enquiries", value: totalLeads, percent: (totalLeads / funnelMax) * 100 },
+        { label: "In Progress", value: inProgress, percent: (inProgress / funnelMax) * 100 },
+        { label: "Closed Clients", value: closedLeads, percent: (closedLeads / funnelMax) * 100 },
       ],
     },
   });

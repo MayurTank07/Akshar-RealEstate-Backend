@@ -90,6 +90,10 @@ export const updateStaff = asyncHandler(async (req, res) => {
   const body = { ...req.validated.body };
   const current = await Staff.findById(req.validated.params.id).select("+passwordHash");
   if (!current) throw new ApiError(404, "Staff member not found");
+  const shouldRevokeSessions =
+    Boolean(body.password) ||
+    (body.status && body.status !== current.status) ||
+    (body.role && body.role !== current.role);
 
   if (body.password) {
     body.passwordHash = await Staff.hashPassword(body.password);
@@ -104,6 +108,7 @@ export const updateStaff = asyncHandler(async (req, res) => {
   }
 
   Object.assign(current, body);
+  if (shouldRevokeSessions) current.tokenVersion = (current.tokenVersion || 0) + 1;
   await current.save();
 
   res.json({ success: true, data: cleanStaff(current) });

@@ -17,6 +17,23 @@ export const staffLoginSchema = z.object({
   }),
 });
 
+export const profileUpdateSchema = z.object({
+  body: z.object({
+    name: z.string().min(2).optional(),
+    email: z.string().email().optional(),
+    phone: z.string().optional().default(""),
+    designation: z.string().optional(),
+    avatar: z.string().optional(),
+  }),
+});
+
+export const passwordChangeSchema = z.object({
+  body: z.object({
+    currentPassword: z.string().min(6),
+    newPassword: z.string().min(8),
+  }),
+});
+
 export const propertySchema = z.object({
   body: z.object({
     title: z.string().min(2),
