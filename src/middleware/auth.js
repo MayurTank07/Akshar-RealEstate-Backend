@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import { DEFAULT_SUPERVISOR_PERMISSIONS } from "../config/permissions.js";
 import { env } from "../config/env.js";
 import { Staff } from "../models/Staff.js";
+import { User } from "../models/User.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
@@ -30,6 +31,38 @@ export const authenticate = asyncHandler(async (req, _res, next) => {
   }
 
   req.user = staff;
+  next();
+});
+
+export const authenticateUser = asyncHandler(async (req, _res, next) => {
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+
+  if (!token) {
+    throw new ApiError(401, "Authentication required");
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, env.jwtSecret);
+  } catch {
+    throw new ApiError(401, "Invalid or expired session");
+  }
+
+  if (decoded.kind !== "user") {
+    throw new ApiError(401, "Invalid user session");
+  }
+
+  const user = await User.findById(decoded.sub).select("-passwordHash");
+  if (!user || user.status !== "active") {
+    throw new ApiError(401, "User account is inactive or no longer exists");
+  }
+
+  if ((decoded.version ?? 0) !== (user.tokenVersion ?? 0)) {
+    throw new ApiError(401, "Session has been signed out");
+  }
+
+  req.ownerUser = user;
   next();
 });
 

@@ -5,6 +5,7 @@ import { OwnerApplication } from "./models/OwnerApplication.js";
 import { Property } from "./models/Property.js";
 import { SiteContent } from "./models/SiteContent.js";
 import { Staff } from "./models/Staff.js";
+import { siteContentDefaults } from "./config/siteDefaults.js";
 
 const image = "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=900";
 
@@ -149,15 +150,7 @@ async function seed() {
     ]);
   }
 
-  if ((await SiteContent.countDocuments()) === 0) {
-    await SiteContent.insertMany([
-      { key: "siteName", section: "Branding", label: "Site Name", value: "Akshar Estate The Property HUB" },
-      { key: "heroTitle", section: "Home Hero", label: "Hero Title", type: "textarea", value: "We Turn Spaces into Places You Call Home" },
-      { key: "heroSubtitle", section: "Home Hero", label: "Hero Subtitle", type: "textarea", value: "Discover verified homes, apartments, and investment-ready properties across Gujarat." },
-      { key: "newEnquiryEmail", section: "Email Templates", label: "New Enquiry Email Template", type: "textarea", value: "Hello {{ userName }}, thanks for enquiring about {{ propertyName }}." },
-      { key: "ownerApprovalEmail", section: "Email Templates", label: "Owner Approval Email Template", type: "textarea", value: "Hello {{ ownerName }}, your owner application has been approved." },
-    ]);
-  }
+  await Promise.all(siteContentDefaults.map((item) => SiteContent.updateOne({ key: item.key }, { $setOnInsert: item }, { upsert: true })));
 
   if ((await Activity.countDocuments()) === 0) {
     await Activity.insertMany([

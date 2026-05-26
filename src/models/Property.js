@@ -6,7 +6,13 @@ const propertySchema = new mongoose.Schema(
     location: { type: String, required: true, trim: true },
     city: { type: String, trim: true, default: "" },
     type: { type: String, required: true, trim: true },
+    dealType: { type: String, trim: true, default: "" },
+    developerName: { type: String, trim: true, default: "" },
+    topProject: { type: String, trim: true, default: "" },
+    topDeveloper: { type: String, trim: true, default: "" },
     price: { type: String, required: true, trim: true },
+    priceUnit: { type: String, trim: true, default: "" },
+    priceAmount: { type: Number, default: 0 },
     beds: { type: Number, default: 0 },
     baths: { type: Number, default: 0 },
     sqft: { type: Number, default: 0 },
@@ -24,9 +30,14 @@ const propertySchema = new mongoose.Schema(
     badge: { type: String, trim: true, default: "" },
     badgeColor: { type: String, trim: true, default: "bg-blue-600" },
     status: { type: String, enum: ["active", "pending", "inactive", "sold", "rented"], default: "active" },
+    statusUpdatedAt: { type: Date, default: null },
+    statusUpdatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Staff", default: null },
     propertyStatus: { type: String, trim: true, default: "Ready" },
     category: { type: String, trim: true, default: "" },
     availability: { type: String, trim: true, default: "" },
+    constructionStatus: { type: String, trim: true, default: "" },
+    possessionStatus: { type: String, trim: true, default: "" },
+    brokerageType: { type: String, trim: true, default: "" },
     facing: { type: String, trim: true, default: "" },
     visibility: { type: String, enum: ["public", "private"], default: "public" },
     featured: { type: Boolean, default: false },
@@ -40,11 +51,27 @@ const propertySchema = new mongoose.Schema(
     facilities: [{ type: String, trim: true }],
     highlights: [{ type: String, trim: true }],
     parking: { type: String, trim: true, default: "" },
+    floorNumber: { type: String, trim: true, default: "" },
+    totalFloors: { type: String, trim: true, default: "" },
     furnishing: { type: String, trim: true, default: "" },
+    ageOfProperty: { type: String, trim: true, default: "" },
     propertyTags: [{ type: String, trim: true }],
     isPreLeased: { type: Boolean, default: false },
     isBarter: { type: Boolean, default: false },
     roi: { type: String, trim: true, default: "" },
+    finalPrice: { type: String, trim: true, default: "" },
+    finalPriceAmount: { type: Number, default: 0 },
+    commission: { type: String, trim: true, default: "" },
+    commissionAmount: { type: Number, default: 0 },
+    paymentDetails: { type: String, trim: true, default: "" },
+    statusRemarks: { type: String, trim: true, default: "" },
+    dealSource: { type: String, enum: ["", "manual", "enquiry"], default: "" },
+    dealEnquiryId: { type: mongoose.Schema.Types.ObjectId, ref: "Enquiry", default: null },
+    dealCustomerName: { type: String, trim: true, default: "" },
+    dealCustomerPhone: { type: String, trim: true, default: "" },
+    dealCustomerEmail: { type: String, trim: true, default: "" },
+    dealCustomerAddress: { type: String, trim: true, default: "" },
+    dealDate: { type: Date, default: null },
     contact: {
       name: { type: String, trim: true, default: "" },
       phone: { type: String, trim: true, default: "" },
@@ -52,8 +79,13 @@ const propertySchema = new mongoose.Schema(
     },
     map: {
       address: { type: String, trim: true, default: "" },
+      area: { type: String, trim: true, default: "" },
+      city: { type: String, trim: true, default: "" },
+      state: { type: String, trim: true, default: "" },
+      pincode: { type: String, trim: true, default: "" },
       latitude: { type: Number, default: null },
       longitude: { type: Number, default: null },
+      placeId: { type: String, trim: true, default: "" },
       embedUrl: { type: String, trim: true, default: "" },
     },
     seo: {
@@ -66,11 +98,15 @@ const propertySchema = new mongoose.Schema(
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "Staff", default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Staff", default: null },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Staff", default: null },
-    source: { type: String, enum: ["home", "pricing"], default: "pricing" },
+    ownerUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    ownerRequestId: { type: mongoose.Schema.Types.ObjectId, ref: "OwnerApplication", default: null },
+    source: { type: String, enum: ["home", "pricing", "admin_added", "supervisor_added", "seller_owner"], default: "pricing" },
   },
   { timestamps: true }
 );
 
-propertySchema.index({ title: "text", location: "text", city: "text", type: "text", ownerName: "text" });
+propertySchema.index({ title: "text", location: "text", city: "text", type: "text", ownerName: "text", developerName: "text", topProject: "text", topDeveloper: "text", dealType: "text", propertyCode: "text", status: "text", category: "text", propertyStatus: "text" });
+propertySchema.index({ status: 1, statusUpdatedAt: -1, assignedTo: 1, createdBy: 1 });
+propertySchema.index({ propertyCode: 1 }, { unique: true, partialFilterExpression: { propertyCode: { $type: "string", $gt: "" } } });
 
 export const Property = mongoose.model("Property", propertySchema);

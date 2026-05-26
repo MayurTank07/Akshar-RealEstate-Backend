@@ -17,6 +17,47 @@ export const staffLoginSchema = z.object({
   }),
 });
 
+export const userRegisterSchema = z.object({
+  body: z.object({
+    name: z.string().trim().min(2),
+    email: z.string().email(),
+    phone: z.string().trim().min(8),
+    password: z.string().min(8),
+  }),
+});
+
+export const userLoginSchema = z.object({
+  body: z.object({
+    email: z.string().email(),
+    password: z.string().min(6),
+  }),
+});
+
+export const userWishlistItemSchema = z.object({
+  body: z
+    .object({
+      _id: z.string().optional(),
+      id: z.union([z.string(), z.number()]).optional(),
+      source: z.string().trim().optional().default("property"),
+      title: z.string().trim().optional().default(""),
+      location: z.string().trim().optional().default(""),
+      city: z.string().trim().optional().default(""),
+      area: z.union([z.string(), z.number()]).optional().default(""),
+      image: z.string().trim().optional().default(""),
+      price: z.union([z.string(), z.number()]).optional().default(""),
+      priceAmount: z.coerce.number().optional().default(0),
+      beds: z.coerce.number().optional().default(0),
+      baths: z.coerce.number().optional().default(0),
+      sqft: z.coerce.number().optional().default(0),
+      type: z.string().trim().optional().default(""),
+      tag: z.string().trim().optional().default(""),
+      badge: z.string().trim().optional().default(""),
+      badgeColor: z.string().trim().optional().default(""),
+    })
+    .passthrough()
+    .refine((value) => value._id || value.id, "Property id is required"),
+});
+
 export const profileUpdateSchema = z.object({
   body: z.object({
     name: z.string().min(2).optional(),
@@ -40,7 +81,13 @@ export const propertySchema = z.object({
     location: z.string().min(2),
     city: z.string().optional().default(""),
     type: z.string().min(2),
+    dealType: z.string().optional().default(""),
+    developerName: z.string().optional().default(""),
+    topProject: z.string().optional().default(""),
+    topDeveloper: z.string().optional().default(""),
     price: z.string().min(1),
+    priceAmount: z.coerce.number().min(0).optional().default(0),
+    priceUnit: z.string().optional().default(""),
     beds: z.coerce.number().int().min(0).default(0),
     baths: z.coerce.number().int().min(0).default(0),
     sqft: z.coerce.number().int().min(0).default(0),
@@ -60,6 +107,9 @@ export const propertySchema = z.object({
     propertyStatus: z.string().optional().default("Ready"),
     category: z.string().optional().default(""),
     availability: z.string().optional().default(""),
+    constructionStatus: z.string().optional().default(""),
+    possessionStatus: z.string().optional().default(""),
+    brokerageType: z.string().optional().default(""),
     facing: z.string().optional().default(""),
     visibility: z.enum(["public", "private"]).optional().default("public"),
     featured: z.coerce.boolean().optional().default(false),
@@ -73,7 +123,10 @@ export const propertySchema = z.object({
     facilities: stringArray,
     highlights: stringArray,
     parking: z.string().optional().default(""),
+    floorNumber: z.string().optional().default(""),
+    totalFloors: z.string().optional().default(""),
     furnishing: z.string().optional().default(""),
+    ageOfProperty: z.string().optional().default(""),
     propertyTags: stringArray,
     isPreLeased: z.coerce.boolean().optional().default(false),
     isBarter: z.coerce.boolean().optional().default(false),
@@ -89,12 +142,17 @@ export const propertySchema = z.object({
     map: z
       .object({
         address: z.string().optional().default(""),
+        area: z.string().optional().default(""),
+        city: z.string().optional().default(""),
+        state: z.string().optional().default(""),
+        pincode: z.string().optional().default(""),
         latitude: z.coerce.number().nullable().optional().default(null),
         longitude: z.coerce.number().nullable().optional().default(null),
+        placeId: z.string().optional().default(""),
         embedUrl: z.string().optional().default(""),
       })
       .optional()
-      .default({ address: "", latitude: null, longitude: null, embedUrl: "" }),
+      .default({ address: "", area: "", city: "", state: "", pincode: "", latitude: null, longitude: null, placeId: "", embedUrl: "" }),
     seo: z
       .object({
         metaTitle: z.string().optional().default(""),
@@ -105,8 +163,23 @@ export const propertySchema = z.object({
       .default({ metaTitle: "", metaDescription: "", slug: "" }),
     yearBuilt: z.coerce.number().int().nullable().optional().default(null),
     propertyCode: z.string().optional().default(""),
+    finalPrice: z.string().optional().default(""),
+    finalPriceAmount: z.coerce.number().min(0).optional().default(0),
+    commission: z.string().optional().default(""),
+    commissionAmount: z.coerce.number().min(0).optional().default(0),
+    paymentDetails: z.string().optional().default(""),
+    statusRemarks: z.string().optional().default(""),
+    dealSource: z.enum(["", "manual", "enquiry"]).optional().default(""),
+    dealEnquiryId: assignableId.optional().nullable(),
+    dealCustomerName: z.string().optional().default(""),
+    dealCustomerPhone: z.string().optional().default(""),
+    dealCustomerEmail: z.union([z.string().email(), z.literal("")]).optional().default(""),
+    dealCustomerAddress: z.string().optional().default(""),
+    dealDate: z.union([z.coerce.date(), z.literal(""), z.null()]).optional().default(null),
     assignedTo: assignableId,
-    source: z.enum(["home", "pricing"]).default("pricing"),
+    ownerUserId: assignableId.optional().nullable(),
+    ownerRequestId: assignableId.optional().nullable(),
+    source: z.enum(["home", "pricing", "admin_added", "supervisor_added", "seller_owner"]).default("pricing"),
   }),
 });
 
@@ -119,6 +192,7 @@ export const enquiryCreateSchema = z.object({
     preferredLocation: z.string().optional().default(""),
     location: z.string().optional(),
     budget: z.union([z.string(), z.number()]).optional().default(""),
+    budgetAmount: z.coerce.number().min(0).optional().default(0),
     budgetLabel: z.string().optional().default(""),
     propertyType: z.string().optional(),
     type: z.string().optional(),
@@ -134,6 +208,14 @@ export const enquiryUpdateSchema = z.object({
   body: enquiryCreateSchema.shape.body.partial().extend({
     assignedTo: objectId.optional().nullable(),
     note: z.string().optional(),
+    conversionType: z.enum(["sold", "rented", "no-conversion", ""]).optional(),
+    finalPrice: z.string().optional(),
+    finalPriceAmount: z.coerce.number().min(0).optional(),
+    commission: z.string().optional(),
+    commissionAmount: z.coerce.number().min(0).optional(),
+    paymentDetails: z.string().optional(),
+    closingDate: z.union([z.coerce.date(), z.literal(""), z.null()]).optional(),
+    remarks: z.string().optional(),
   }),
 });
 
@@ -162,7 +244,78 @@ export const staffUpdateSchema = z.object({
 
 export const ownerStatusSchema = z.object({
   body: z.object({
-    status: z.enum(["pending", "approved", "rejected"]),
+    status: z.enum(["pending", "approved", "rejected", "needs_changes"]),
+    remarks: z.string().optional().default(""),
+  }),
+});
+
+const ownerDeclarationSchema = z.object({
+  ownerOrAuthorized: z.coerce.boolean(),
+  accurateDetails: z.coerce.boolean(),
+  mediaBelongsToProperty: z.coerce.boolean(),
+  understandsRemoval: z.coerce.boolean(),
+  agreesContact: z.coerce.boolean(),
+});
+
+const ownerPropertyDetailsSchema = z.object({
+  title: z.string().trim().min(2),
+  type: z.string().trim().min(2),
+  purpose: z.enum(["sale", "rent", "pre-leased", "other"]).optional().default("sale"),
+  city: z.string().trim().min(2),
+  area: z.string().trim().min(2),
+  address: z.string().trim().optional().default(""),
+  bhk: z.string().trim().optional().default(""),
+  rooms: z.string().trim().optional().default(""),
+  carpetArea: z.coerce.number().min(0).optional().default(0),
+  builtUpArea: z.coerce.number().min(0).optional().default(0),
+  areaUnit: z.string().trim().optional().default("sqft"),
+  floorNumber: z.string().trim().optional().default(""),
+  totalFloors: z.string().trim().optional().default(""),
+  furnishing: z.string().trim().optional().default(""),
+  parking: z.string().trim().optional().default(""),
+  facing: z.string().trim().optional().default(""),
+  ageOfProperty: z.string().trim().optional().default(""),
+  expectedPrice: z.coerce.number().min(1, "Expected price/rent is required"),
+  negotiable: z.coerce.boolean().optional().default(false),
+  maintenanceCharges: z.coerce.number().min(0).optional().default(0),
+  amenities: z.array(z.string().trim().min(1)).optional().default([]),
+  description: z.string().trim().min(20),
+  nearbyLandmarks: z.string().trim().optional().default(""),
+  availability: z.string().trim().optional().default(""),
+  map: z
+    .object({
+      address: z.string().optional().default(""),
+      area: z.string().optional().default(""),
+      city: z.string().optional().default(""),
+      state: z.string().optional().default(""),
+      pincode: z.string().optional().default(""),
+      latitude: z.coerce.number().nullable().optional().default(null),
+      longitude: z.coerce.number().nullable().optional().default(null),
+      placeId: z.string().optional().default(""),
+    })
+    .optional()
+    .default({ address: "", area: "", city: "", state: "", pincode: "", latitude: null, longitude: null, placeId: "" }),
+  notes: z.string().trim().optional().default(""),
+});
+
+export const ownerRequestSchema = z.object({
+  body: z.object({
+    ownerDetails: z.object({
+      name: z.string().trim().min(2),
+      email: z.string().email(),
+      phone: z.string().trim().min(8),
+      alternatePhone: z.string().trim().optional().default(""),
+      ownershipType: z.string().trim().min(2),
+    }),
+    propertyDetails: ownerPropertyDetailsSchema,
+    media: z
+      .object({
+        photos: z.array(z.string().trim().min(1)).min(1, "At least one property photo is required"),
+        videos: z.array(z.string().trim().min(1)).optional().default([]),
+        documents: z.array(z.string().trim().min(1)).optional().default([]),
+      })
+      .default({ photos: [], videos: [], documents: [] }),
+    declaration: ownerDeclarationSchema.refine((value) => Object.values(value).every(Boolean), "All declaration checkboxes must be accepted"),
   }),
 });
 

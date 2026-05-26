@@ -1,8 +1,22 @@
 import { SiteContent } from "../models/SiteContent.js";
+import { siteContentDefaults } from "../config/siteDefaults.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
+async function ensureDefaultContent() {
+  await Promise.all(
+    siteContentDefaults.map((item) =>
+      SiteContent.updateOne(
+        { key: item.key },
+        { $setOnInsert: item },
+        { upsert: true }
+      )
+    )
+  );
+}
+
 export const publicContent = asyncHandler(async (_req, res) => {
+  await ensureDefaultContent();
   const content = await SiteContent.find().sort({ section: 1, key: 1 });
   res.json({ success: true, data: content });
 });

@@ -17,6 +17,10 @@ export const listNotifications = asyncHandler(async (req, res) => {
       unreadCount: notifications.filter((item) => !(item.readBy || []).some((id) => id.toString() === userId)).length,
       notifications: notifications.map((item) => ({
         ...item,
+        category: item.category || String(item.type || "general").toLowerCase(),
+        priority: item.priority || "normal",
+        referenceType: item.referenceType || String(item.type || "").toLowerCase(),
+        referenceId: item.referenceId || item.metadata?.propertyId || item.metadata?.enquiryId || null,
         read: (item.readBy || []).some((id) => id.toString() === userId),
       })),
     },

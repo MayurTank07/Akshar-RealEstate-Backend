@@ -38,6 +38,24 @@ export const avatarUpload = multer({
   },
 });
 
+export const ownerMediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 30 * 1024 * 1024,
+    files: 16,
+  },
+  fileFilter: (_req, file, cb) => {
+    const allowed =
+      file.mimetype?.startsWith("image/") ||
+      file.mimetype?.startsWith("video/") ||
+      ["application/pdf", "image/heic", "image/heif"].includes(file.mimetype);
+    if (!allowed) {
+      return cb(new ApiError(422, "Only image, video, and PDF files are allowed"));
+    }
+    return cb(null, true);
+  },
+});
+
 function uploadBuffer(
   file,
   folder = "akshar-realestate/properties",
@@ -60,6 +78,30 @@ function uploadBuffer(
       (error, result) => {
         if (error) return reject(new ApiError(502, "Image upload failed. Please try again."));
         return resolve(result);
+      }
+    );
+    stream.end(file.buffer);
+  });
+}
+
+function uploadOwnerBuffer(file) {
+  if (!env.cloudinary.cloudName || !env.cloudinary.apiKey || !env.cloudinary.apiSecret) {
+    throw new ApiError(500, "Cloudinary is not configured");
+  }
+
+  const resourceType = file.mimetype?.startsWith("video/") ? "video" : file.mimetype === "application/pdf" ? "raw" : "image";
+  const folder = resourceType === "video" ? "akshar-realestate/owner-submissions/videos" : resourceType === "raw" ? "akshar-realestate/owner-submissions/documents" : "akshar-realestate/owner-submissions/photos";
+
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        resource_type: resourceType,
+        transformation: resourceType === "image" ? [{ quality: "auto", fetch_format: "auto" }, { width: 1800, crop: "limit" }] : undefined,
+      },
+      (error, result) => {
+        if (error) return reject(new ApiError(502, "Media upload failed. Please try again."));
+        return resolve({ ...result, resourceType });
       }
     );
     stream.end(file.buffer);
@@ -108,4 +150,35 @@ export const uploadAvatar = asyncHandler(async (req, res) => {
       publicId: result.public_id,
     },
   });
+});
+
+export const uploadOwnerMedia = asyncHandler(async (req, res) => {
+  const files = req.files || [];
+  if (!files.length) {
+    throw new ApiError(422, "Please upload at least one file");
+  }
+
+  const results = await Promise.all(files.map((file) => uploadOwnerBuffer(file)));
+  const payload = {
+    photos: [],
+    videos: [],
+    documents: [],
+    files: [],
+  };
+
+  results.forEach((result, index) => {
+    const item = {
+      originalName: files[index].originalname,
+      size: files[index].size,
+      url: result.secure_url,
+      publicId: result.public_id,
+      type: result.resourceType,
+    };
+    payload.files.push(item);
+    if (result.resourceType === "video") payload.videos.push(result.secure_url);
+    else if (result.resourceType === "raw") payload.documents.push(result.secure_url);
+    else payload.photos.push(result.secure_url);
+  });
+
+  res.status(201).json({ success: true, data: payload });
 });

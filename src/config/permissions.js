@@ -11,6 +11,7 @@ export const PERMISSIONS = {
   SAVED_MANAGE: "saved:manage",
   CLIENTS_MANAGE: "clients:manage",
   ASSIGNED_VIEW: "assigned:view",
+  OWNER_MANAGEMENT: "owner_management",
 };
 
 export const ALL_PERMISSION_VALUES = Object.values(PERMISSIONS);
