@@ -27,6 +27,7 @@ const ownerApplicationSchema = new mongoose.Schema(
       parking: { type: String, trim: true, default: "" },
       facing: { type: String, trim: true, default: "" },
       ageOfProperty: { type: String, trim: true, default: "" },
+      constructionYear: { type: Number, min: 1900, max: new Date().getFullYear(), default: null },
       expectedPrice: { type: Number, required: true, min: 0 },
       negotiable: { type: Boolean, default: false },
       maintenanceCharges: { type: Number, default: 0 },
@@ -50,6 +51,24 @@ const ownerApplicationSchema = new mongoose.Schema(
       photos: [{ type: String, trim: true }],
       videos: [{ type: String, trim: true }],
       documents: [{ type: String, trim: true }],
+      ownerProofs: [
+        {
+          documentType: {
+            type: String,
+            enum: ["Ownership Proof", "Electricity Bill", "Tax Bill", "Index Copy", "Other"],
+            required: true,
+          },
+          originalName: { type: String, required: true, trim: true },
+          mimeType: { type: String, required: true, trim: true },
+          resourceType: { type: String, trim: true, default: "image" },
+          format: { type: String, trim: true, default: "" },
+          size: { type: Number, min: 0, default: 0 },
+          url: { type: String, required: true, trim: true },
+          publicId: { type: String, trim: true, default: "" },
+          status: { type: String, enum: ["uploaded", "verified", "rejected"], default: "uploaded" },
+          uploadedAt: { type: Date, default: Date.now },
+        },
+      ],
     },
     declaration: {
       ownerOrAuthorized: { type: Boolean, required: true },
@@ -65,6 +84,13 @@ const ownerApplicationSchema = new mongoose.Schema(
     reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Staff", default: null },
     reviewedAt: { type: Date, default: null },
     approvedPropertyId: { type: mongoose.Schema.Types.ObjectId, ref: "Property", default: null },
+    approvalInProgress: { type: Boolean, default: false },
+    deleteStatus: { type: String, enum: ["none", "pending", "approved", "rejected"], default: "none" },
+    deleteReason: { type: String, trim: true, default: "" },
+    deleteRequestedAt: { type: Date, default: null },
+    deleteReviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Staff", default: null },
+    deleteReviewedAt: { type: Date, default: null },
+    deleteReviewRemarks: { type: String, trim: true, default: "" },
     source: { type: String, enum: ["seller_owner"], default: "seller_owner" },
     statusHistory: [
       {
@@ -87,6 +113,7 @@ const ownerApplicationSchema = new mongoose.Schema(
 );
 
 ownerApplicationSchema.index({ status: 1, createdAt: -1 });
+ownerApplicationSchema.index({ deleteStatus: 1, deleteRequestedAt: -1 });
 ownerApplicationSchema.index({ ownerUserId: 1, createdAt: -1 });
 ownerApplicationSchema.index({ name: "text", email: "text", phone: "text", "propertyDetails.title": "text", "propertyDetails.city": "text", "propertyDetails.area": "text", "propertyDetails.type": "text" });
 

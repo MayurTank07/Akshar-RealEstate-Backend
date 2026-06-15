@@ -11,7 +11,10 @@ import { errorHandler, notFound } from "./middleware/errorHandler.js";
 
 const app = express();
 
-app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+}));
 app.use(
   cors({
     origin(origin, callback) {

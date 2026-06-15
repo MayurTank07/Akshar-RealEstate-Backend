@@ -63,6 +63,13 @@ export const contactContentDefault = {
   email: "info@aksharrealestate.com",
   address: "SG Highway, Ahmedabad, Gujarat 380054",
   whatsapp: "+91 98765 43210",
+  whatsappSettings: {
+    enabled: true,
+    phone: "+91 98765 43210",
+    message: "Hello Akshar Estate : The Property Hub, I would like to make an enquiry about your property services. Please share more details.",
+    position: "bottom-right",
+    displayOn: "all",
+  },
   officeTiming: "Mon - Sat, 10:00 AM to 7:00 PM",
   mapEmbed: "",
   mapLink: "",
@@ -96,4 +103,14 @@ export const siteContentDefaults = [
   { key: "contactContent", section: "Contact Us", label: "Contact Us CMS Content", type: "json", value: contactContentDefault },
   { key: "newEnquiryEmail", section: "Email Templates", label: "New Enquiry Email Template", type: "textarea", value: "Hello {{ userName }}, thanks for enquiring about {{ propertyName }}." },
   { key: "ownerApprovalEmail", section: "Email Templates", label: "Owner Approval Email Template", type: "textarea", value: "Hello {{ ownerName }}, your owner application has been approved." },
+  {
+    key: "brokerageSettings",
+    section: "Business Settings",
+    label: "Brokerage & Commission Settings",
+    type: "json",
+    value: {
+      percentage: 2,
+      notes: "Standard brokerage charged on successful property transactions.",
+    },
+  },
 ];

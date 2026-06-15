@@ -37,7 +37,10 @@ export function enquiryScope(user, query = {}, dateField = "createdAt") {
     filter.conversionType = query.conversionType === "no-conversion" ? { $in: ["no-conversion", "", null] } : query.conversionType;
   }
   if (query.status && query.status !== "all") filter.status = query.status;
-  if (query.range || query.dateFrom || query.dateTo) {
+  if (query.search) filter.$text = { $search: query.search };
+  const hasSpecificDateRange = query.dateFrom || query.dateTo;
+  const hasNamedRange = query.range && query.range !== "custom" && query.range !== "all-time" && query.range !== "all";
+  if (hasSpecificDateRange || hasNamedRange) {
     Object.assign(filter, dateMatch(dateField, query));
   }
   return filter;

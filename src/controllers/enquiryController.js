@@ -40,6 +40,7 @@ function activityTargets(...ids) {
 function enquiryFilter(query, user) {
   const filter = {};
   if (query.status && query.status !== "all") filter.status = query.status;
+  if (query.source && query.source !== "all") filter.source = query.source;
   if (query.conversionType && query.conversionType !== "all") {
     filter.conversionType = query.conversionType === "no-conversion" ? { $in: ["no-conversion", "", null] } : query.conversionType;
   }
@@ -152,6 +153,7 @@ export const updateEnquiry = asyncHandler(async (req, res) => {
   const note = update.note;
   delete update.note;
   if (update.closingDate === "") update.closingDate = null;
+  if (update.followUpDate === "") update.followUpDate = null;
 
   const enquiry = await Enquiry.findById(req.validated.params.id);
   if (!enquiry) throw new ApiError(404, "Enquiry not found");

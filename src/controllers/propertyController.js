@@ -4,12 +4,128 @@ import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { parseINRAmount, parseMoneyToCrores } from "../utils/reporting.js";
 import { generatePropertyCode, previewPropertyCode, syncPropertyCodeCounter } from "../services/propertyCodeService.js";
+import { publicPropertyView } from "../utils/publicProperty.js";
 
 function escapeRegExp(value) {
   return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-const listQuery = (query) => {
+const searchNumberWords = {
+  zero: "0",
+  one: "1",
+  two: "2",
+  three: "3",
+  four: "4",
+  five: "5",
+  six: "6",
+  seven: "7",
+  eight: "8",
+  nine: "9",
+  ten: "10",
+};
+
+const searchSynonyms = new Map([
+  ["flat", "apartment"],
+  ["flats", "apartment"],
+  ["apartments", "apartment"],
+  ["shop", "retail"],
+  ["shops", "retail"],
+  ["office space", "office"],
+  ["sell", "sale"],
+  ["buy", "sale"],
+  ["rental", "rent"],
+  ["lease", "rent"],
+  ["fully furnished", "furnished"],
+  ["semi furnished", "semi-furnished"],
+  ["un furnished", "unfurnished"],
+  ["new projects", "new launch"],
+  ["new project", "new launch"],
+]);
+
+const SEARCH_FIELDS = [
+  "title",
+  "propertyCode",
+  "location",
+  "city",
+  "type",
+  "dealType",
+  "status",
+  "propertyStatus",
+  "category",
+  "availability",
+  "constructionStatus",
+  "possessionStatus",
+  "developerName",
+  "topProject",
+  "topDeveloper",
+  "price",
+  "priceUnit",
+  "furnishing",
+  "facing",
+  "ownership",
+  "parking",
+  "area",
+  "description",
+  "amenities",
+  "features",
+  "facilities",
+  "highlights",
+  "propertyTags",
+  "measurement.unit",
+  "measurement.customUnit",
+];
+
+function normalizeSearch(value = "") {
+  let text = String(value || "").toLowerCase();
+  Object.entries(searchNumberWords).forEach(([word, number]) => {
+    text = text.replace(new RegExp(`\\b${word}\\s+bhk\\b`, "g"), `${number}bhk`);
+  });
+  text = text
+    .replace(/\b(\d+)\s*b\s*h\s*k\b/g, "$1bhk")
+    .replace(/\b(\d+)\s+bed(room)?s?\b/g, "$1bhk")
+    .replace(/\b(properties?|flats?|homes?)\s+(for\s+)?(sale|rent|buy|lease)\s+in\b/g, " ")
+    .replace(/\b(for\s+)?(sale|rent|buy|lease)\s+in\b/g, " ")
+    .replace(/\bproperties\s+in\b/g, " ");
+  searchSynonyms.forEach((to, from) => {
+    text = text.replace(new RegExp(`\\b${escapeRegExp(from).replace(/\s+/g, "\\s+")}\\b`, "g"), to);
+  });
+  return text.replace(/[^a-z0-9.-]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function searchTokens(value = "") {
+  const normalized = normalizeSearch(value).replace(/\b(under|below|less than|upto|up to|above|over|greater than|from|min|max)?\s*(\d+(?:\.\d+)?)\s*(cr|crore|crores|lakh|lakhs|lac|lacs|k|thousand)\b/g, " ");
+  return normalized
+    .split(" ")
+    .map((token) => token.trim())
+    .filter((token) => token.length > 1 && !["for", "in", "at", "the"].includes(token));
+}
+
+function priceIntentFilter(query) {
+  const normalized = normalizeSearch(query);
+  const match = normalized.match(/\b(under|below|less than|upto|up to|above|over|greater than|from|min|max)?\s*(\d+(?:\.\d+)?)\s*(cr|crore|crores|lakh|lakhs|lac|lacs|k|thousand)?\b/);
+  if (!match || !/(under|below|less|upto|up to|above|over|greater|from|min|max|cr|crore|lakh|lac|thousand)/.test(match[0])) return null;
+  const unit = match[3] || "";
+  const amount = Number(match[2]) * (
+    unit.startsWith("cr") || unit.startsWith("crore") ? 10000000 :
+    unit.startsWith("lakh") || unit.startsWith("lac") ? 100000 :
+    unit.startsWith("k") || unit.startsWith("thousand") ? 1000 :
+    1
+  );
+  if (!amount) return null;
+  if (["under", "below", "less than", "upto", "up to", "max"].includes(match[1])) return { priceAmount: { $lte: amount } };
+  if (["above", "over", "greater than", "from", "min"].includes(match[1])) return { priceAmount: { $gte: amount } };
+  return { priceAmount: { $gte: amount * 0.8, $lte: amount * 1.2 } };
+}
+
+function tokenSearchFilter(token, includePrivateSearch) {
+  const bhk = token.match(/^(\d+)bhk$/);
+  if (bhk) return { beds: Number(bhk[1]) };
+  const pattern = new RegExp(escapeRegExp(token), "i");
+  const fields = includePrivateSearch ? [...SEARCH_FIELDS, "ownerName"] : SEARCH_FIELDS;
+  return { $or: fields.map((field) => ({ [field]: pattern })) };
+}
+
+const listQuery = (query, { includePrivateSearch = true } = {}) => {
   const filter = {};
 
   if (query.status && query.status !== "all") filter.status = query.status;
@@ -23,24 +139,12 @@ const listQuery = (query) => {
   if (query.source) filter.source = query.source;
   if (query.propertyCode && query.propertyCode !== "all") filter.propertyCode = new RegExp(escapeRegExp(query.propertyCode), "i");
   if (query.propertyId && query.propertyId !== "all") filter.propertyCode = new RegExp(escapeRegExp(query.propertyId), "i");
-  if (query.search) {
-    const pattern = new RegExp(escapeRegExp(query.search), "i");
-    filter.$or = [
-      { title: pattern },
-      { propertyCode: pattern },
-      { location: pattern },
-      { city: pattern },
-      { type: pattern },
-      { dealType: pattern },
-      { status: pattern },
-      { propertyStatus: pattern },
-      { category: pattern },
-      { ownerName: pattern },
-      { developerName: pattern },
-      { topProject: pattern },
-      { topDeveloper: pattern },
-      { price: pattern },
-    ];
+  const search = query.search || query.q || "";
+  if (search) {
+    const tokenFilters = searchTokens(search).map((token) => tokenSearchFilter(token, includePrivateSearch));
+    const priceFilter = priceIntentFilter(search);
+    const allFilters = [...tokenFilters, ...(priceFilter ? [priceFilter] : [])];
+    if (allFilters.length) filter.$and = [...(filter.$and || []), ...allFilters];
   }
 
   return filter;
@@ -53,7 +157,10 @@ function supervisorOwnershipFilter(user) {
 
 function canAccessProperty(user, property) {
   if (user.role === "admin") return true;
-  return [property.assignedTo, property.createdBy].some((id) => id && id.toString() === user._id.toString());
+  return [property.assignedTo, property.createdBy].some((value) => {
+    const id = value?._id || value;
+    return id && id.toString() === user._id.toString();
+  });
 }
 
 function activityTargets(...ids) {
@@ -95,21 +202,26 @@ function validateDealDetails(body, existing) {
 }
 
 export const publicProperties = asyncHandler(async (req, res) => {
-  const filter = listQuery({ ...req.query, status: req.query.status || "active" });
+  const filter = listQuery({ ...req.query, status: req.query.status || "active" }, { includePrivateSearch: false });
   filter.visibility = { $ne: "private" };
-  const properties = await Property.find(filter).sort({ createdAt: -1 });
-  res.json({ success: true, data: properties });
+  const properties = await Property.find(filter)
+    .populate("assignedTo", "name phone designation avatar role")
+    .populate("createdBy", "name phone designation avatar role")
+    .sort({ createdAt: -1 });
+  res.json({ success: true, data: properties.map(publicPropertyView) });
 });
 
 export const publicProperty = asyncHandler(async (req, res) => {
-  const property = await Property.findOne({ _id: req.validated.params.id, visibility: { $ne: "private" } });
+  const property = await Property.findOne({ _id: req.validated.params.id, visibility: { $ne: "private" } })
+    .populate("assignedTo", "name phone designation avatar role")
+    .populate("createdBy", "name phone designation avatar role");
   if (!property) throw new ApiError(404, "Property not found");
-  res.json({ success: true, data: property });
+  res.json({ success: true, data: publicPropertyView(property) });
 });
 
 export const listProperties = asyncHandler(async (req, res) => {
   let properties = await Property.find({ ...listQuery(req.query), ...supervisorOwnershipFilter(req.user) })
-    .populate("assignedTo", "name email role")
+    .populate("assignedTo", "name email phone designation avatar role")
     .sort({ createdAt: -1 });
   const minPrice = Number(req.query.minPrice || 0);
   const maxPrice = Number(req.query.maxPrice || 0);
@@ -123,7 +235,7 @@ export const listProperties = asyncHandler(async (req, res) => {
 });
 
 export const getProperty = asyncHandler(async (req, res) => {
-  const property = await Property.findById(req.validated.params.id).populate("assignedTo", "name email role");
+  const property = await Property.findById(req.validated.params.id).populate("assignedTo", "name email phone designation avatar role");
   if (!property) throw new ApiError(404, "Property not found");
   if (!canAccessProperty(req.user, property)) throw new ApiError(403, "You can only access assigned properties");
   res.json({ success: true, data: property });
@@ -253,6 +365,7 @@ export const deleteProperty = asyncHandler(async (req, res) => {
   const property = await Property.findById(req.validated.params.id);
   if (!property) throw new ApiError(404, "Property not found");
   if (!canAccessProperty(req.user, property)) throw new ApiError(403, "You can only delete assigned properties");
+  if (property.status === "sold") throw new ApiError(400, "Sold properties cannot be deleted because they are retained for reports and analytics.");
   await property.deleteOne();
   await Activity.create({
     type: "Property",

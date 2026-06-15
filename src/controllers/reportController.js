@@ -27,6 +27,20 @@ const detailColumns = [
   { key: "remarks", label: "Remarks", width: 54 },
 ];
 
+const enquiryColumns = [
+  { key: "srNo", label: "Sr No", width: 28 },
+  { key: "enquiryDate", label: "Enquiry Date", width: 48 },
+  { key: "customerName", label: "Customer Name", width: 55 },
+  { key: "phone", label: "Phone", width: 48 },
+  { key: "email", label: "Email", width: 66 },
+  { key: "propertyTitle", label: "Property Title", width: 62 },
+  { key: "location", label: "Location", width: 52 },
+  { key: "assignedSupervisor", label: "Assigned Supervisor", width: 58 },
+  { key: "status", label: "Status", width: 38 },
+  { key: "message", label: "Message / Requirement", width: 74 },
+  { key: "followUpDate", label: "Follow-up Date", width: 48 },
+];
+
 function safeHtml(value) {
   return String(value ?? "").replace(/[<>&"]/g, (char) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[char]);
 }
@@ -185,14 +199,45 @@ async function filterMetadata(query, user, type) {
     "Role type": labelize(user.role),
     "Generated for": user.name || user.email || "",
     ...(supervisor ? { Supervisor: supervisor.name } : {}),
-    "Date range": labelize(query.range || "this-month"),
+    "Date range": query.range === "all-time" ? "All Time" : query.range === "last-30" ? "Last 30 Days" : labelize(query.range || "this-month"),
     ...(query.city && query.city !== "all" ? { City: query.city } : {}),
     ...(query.propertyType && query.propertyType !== "all" ? { "Property type": query.propertyType } : {}),
     ...(query.source && query.source !== "all" ? { "Lead source": labelize(query.source) } : {}),
+    ...(query.status && query.status !== "all" ? { Status: labelize(query.status) } : {}),
+    ...(query.search ? { Search: query.search } : {}),
     ...(query.conversionType && query.conversionType !== "all" ? { Conversion: labelize(query.conversionType) } : {}),
     ...(query.dateFrom ? { "From date": query.dateFrom } : {}),
     ...(query.dateTo ? { "To date": query.dateTo } : {}),
-    "Report type": type === "analytics" ? "Analytics" : "Sold & Rented",
+    "Report type": type === "analytics" ? "Analytics" : type === "enquiries" ? "Enquiries" : "Sold & Rented",
+  };
+}
+
+async function buildEnquiryReport(user, query = {}) {
+  const enquiries = await Enquiry.find(enquiryScope(user, query))
+    .populate("assignedTo", "name email role")
+    .populate("propertyId", "title city location type propertyCode")
+    .sort({ createdAt: -1 })
+    .lean();
+  const rows = enquiries.map((item, index) => ({
+    srNo: index + 1,
+    enquiryDate: formatDate(item.createdAt),
+    customerName: item.name || "",
+    phone: item.phone || "",
+    email: item.email || "",
+    propertyTitle: item.propertyId?.title || item.propertyTitle || "General enquiry",
+    location: item.propertyId?.city || item.propertyId?.location || item.preferredLocation || "",
+    assignedSupervisor: item.assignedTo?.name || "Unassigned",
+    status: labelize(item.status),
+    message: item.message || item.remarks || item.notes?.at(-1)?.text || "",
+    followUpDate: formatDate(item.followUpDate),
+  }));
+  return {
+    title: "Enquiries Report",
+    columns: enquiryColumns,
+    rows,
+    summary: { "Total enquiries": rows.length },
+    filters: await filterMetadata(query, user, "enquiries"),
+    generatedAt: formatDateTime(),
   };
 }
 
@@ -245,7 +290,8 @@ async function buildSimpleRows(type, user) {
 }
 
 function renderExcel(report) {
-  const columnHtml = detailColumns.map((column) => `<col style="width:${Math.max(70, column.width * 1.6)}px" />`).join("");
+  const columns = report.columns || detailColumns;
+  const columnHtml = columns.map((column) => `<col style="width:${Math.max(70, column.width * 1.6)}px" />`).join("");
   const summaryRows = Object.entries(report.summary)
     .map(([label, value]) => `<tr><th>${safeHtml(label)}</th><td>${safeHtml(value)}</td></tr>`)
     .join("");
@@ -255,9 +301,9 @@ function renderExcel(report) {
     .join("");
   const detailRows = report.rows.length
     ? report.rows
-        .map((row) => `<tr>${detailColumns.map((column) => `<td>${safeHtml(row[column.key])}</td>`).join("")}</tr>`)
+        .map((row) => `<tr>${columns.map((column) => `<td>${safeHtml(row[column.key])}</td>`).join("")}</tr>`)
         .join("")
-    : `<tr><td colspan="${detailColumns.length}" class="empty">No records found</td></tr>`;
+    : `<tr><td colspan="${columns.length}" class="empty">No records found</td></tr>`;
 
   return `<!doctype html>
 <html>
@@ -287,7 +333,7 @@ function renderExcel(report) {
   <h2>Detailed Table</h2>
   <table class="detail">
     <colgroup>${columnHtml}</colgroup>
-    <thead><tr>${detailColumns.map((column) => `<th>${safeHtml(column.label)}</th>`).join("")}</tr></thead>
+    <thead><tr>${columns.map((column) => `<th>${safeHtml(column.label)}</th>`).join("")}</tr></thead>
     <tbody>${detailRows}</tbody>
   </table>
 </body>
@@ -304,6 +350,7 @@ function rect(commands, x, y, width, height, stroke = true, fill = false) {
 }
 
 function renderPdf(report) {
+  const columns = report.columns || detailColumns;
   const pageWidth = 842;
   const pageHeight = 595;
   const margin = 24;
@@ -342,13 +389,13 @@ function renderPdf(report) {
     let y = top - 158;
     commands.push("0.90 0.94 1 rg");
     let x = margin;
-    detailColumns.forEach((column) => {
+    columns.forEach((column) => {
       rect(commands, x, y, column.width, headerHeight, true, true);
       x += column.width;
     });
     commands.push("0 0 0 rg");
     x = margin;
-    detailColumns.forEach((column) => {
+    columns.forEach((column) => {
       text(commands, truncate(column.label, Math.floor(column.width / 4.2)), x + 3, y + 8, 5.4);
       x += column.width;
     });
@@ -358,13 +405,13 @@ function renderPdf(report) {
       x = margin;
       const row = rows[rowIndex];
       commands.push(rowIndex % 2 === 0 ? "1 1 1 rg" : "0.97 0.98 1 rg");
-      detailColumns.forEach((column) => {
+      columns.forEach((column) => {
         rect(commands, x, y, column.width, rowHeight, true, true);
         x += column.width;
       });
       commands.push("0 0 0 rg");
       x = margin;
-      detailColumns.forEach((column) => {
+      columns.forEach((column) => {
         text(commands, truncate(row[column.key], Math.floor(column.width / 3.8)), x + 3, y + 10, 5.2);
         x += column.width;
       });
@@ -420,8 +467,8 @@ export const exportReport = asyncHandler(async (req, res) => {
   const format = req.query.format || "csv";
   const date = new Date().toISOString().slice(0, 10);
 
-  if (type === "analytics" || type === "sold-rented") {
-    const report = await buildDealReport(type, req.user, req.query);
+  if (type === "analytics" || type === "sold-rented" || type === "enquiries") {
+    const report = type === "enquiries" ? await buildEnquiryReport(req.user, req.query) : await buildDealReport(type, req.user, req.query);
     const filename = `${cleanFilePart(type)}-report-${date}`;
 
     if (format === "pdf") {

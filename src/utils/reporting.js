@@ -51,6 +51,8 @@ export function getDateRange(query = {}) {
       // already at today start
     } else if (range === "this-week") {
       start.setDate(start.getDate() - 6);
+    } else if (range === "last-30") {
+      start.setDate(start.getDate() - 29);
     } else if (range === "quarterly") {
       start.setMonth(start.getMonth() - 2, 1);
     } else if (range === "six-months") {

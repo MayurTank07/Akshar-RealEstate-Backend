@@ -23,6 +23,7 @@ const enquirySchema = new mongoose.Schema(
     commissionAmount: { type: Number, default: 0 },
     paymentDetails: { type: String, trim: true, default: "" },
     closingDate: { type: Date, default: null },
+    followUpDate: { type: Date, default: null },
     remarks: { type: String, trim: true, default: "" },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "Staff" },
     notes: [

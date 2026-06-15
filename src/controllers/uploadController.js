@@ -1,6 +1,7 @@
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
 import { env } from "../config/env.js";
+import { Staff } from "../models/Staff.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
@@ -51,6 +52,21 @@ export const ownerMediaUpload = multer({
       ["application/pdf", "image/heic", "image/heif"].includes(file.mimetype);
     if (!allowed) {
       return cb(new ApiError(422, "Only image, video, and PDF files are allowed"));
+    }
+    return cb(null, true);
+  },
+});
+
+export const ownerProofUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 15 * 1024 * 1024,
+    files: 5,
+  },
+  fileFilter: (_req, file, cb) => {
+    const allowed = file.mimetype?.startsWith("image/") || file.mimetype === "application/pdf";
+    if (!allowed) {
+      return cb(new ApiError(422, "Owner proofs must be PDF or image files"));
     }
     return cb(null, true);
   },
@@ -108,6 +124,30 @@ function uploadOwnerBuffer(file) {
   });
 }
 
+function uploadOwnerProofBuffer(file) {
+  if (!env.cloudinary.cloudName || !env.cloudinary.apiKey || !env.cloudinary.apiSecret) {
+    throw new ApiError(500, "Cloudinary is not configured");
+  }
+
+  const resourceType = file.mimetype === "application/pdf" ? "raw" : "image";
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: "akshar-realestate/private/owner-proofs",
+        resource_type: resourceType,
+        type: "authenticated",
+        access_mode: "authenticated",
+        transformation: resourceType === "image" ? [{ quality: "auto", fetch_format: "auto" }, { width: 1800, crop: "limit" }] : undefined,
+      },
+      (error, result) => {
+        if (error) return reject(new ApiError(502, "Owner proof upload failed. Please try again."));
+        return resolve(result);
+      }
+    );
+    stream.end(file.buffer);
+  });
+}
+
 export const uploadPropertyImages = asyncHandler(async (req, res) => {
   const files = req.files || [];
   if (!files.length) {
@@ -152,6 +192,44 @@ export const uploadAvatar = asyncHandler(async (req, res) => {
   });
 });
 
+async function saveStaffCover(staff, file) {
+  const result = await uploadBuffer(file, "akshar-realestate/staff-covers", [
+    { width: 1800, height: 600, crop: "fill", gravity: "auto" },
+    { quality: "auto", fetch_format: "auto" },
+  ]);
+  staff.coverImage = result.secure_url;
+  await staff.save();
+  return result;
+}
+
+export const uploadMyCover = asyncHandler(async (req, res) => {
+  if (!req.file) throw new ApiError(422, "Please upload a cover image");
+  const result = await saveStaffCover(req.user, req.file);
+  res.status(201).json({ success: true, data: { url: result.secure_url, publicId: result.public_id } });
+});
+
+export const removeMyCover = asyncHandler(async (req, res) => {
+  req.user.coverImage = "";
+  await req.user.save();
+  res.json({ success: true, data: { url: "" } });
+});
+
+export const uploadStaffCover = asyncHandler(async (req, res) => {
+  if (!req.file) throw new ApiError(422, "Please upload a cover image");
+  const staff = await Staff.findById(req.validated.params.id);
+  if (!staff) throw new ApiError(404, "Staff member not found");
+  const result = await saveStaffCover(staff, req.file);
+  res.status(201).json({ success: true, data: { url: result.secure_url, publicId: result.public_id } });
+});
+
+export const removeStaffCover = asyncHandler(async (req, res) => {
+  const staff = await Staff.findById(req.validated.params.id);
+  if (!staff) throw new ApiError(404, "Staff member not found");
+  staff.coverImage = "";
+  await staff.save();
+  res.json({ success: true, data: { url: "" } });
+});
+
 export const uploadOwnerMedia = asyncHandler(async (req, res) => {
   const files = req.files || [];
   if (!files.length) {
@@ -181,4 +259,42 @@ export const uploadOwnerMedia = asyncHandler(async (req, res) => {
   });
 
   res.status(201).json({ success: true, data: payload });
+});
+
+export const uploadOwnerProofs = asyncHandler(async (req, res) => {
+  const files = req.files || [];
+  const documentType = String(req.body?.documentType || "");
+  const allowedTypes = ["Ownership Proof", "Electricity Bill", "Tax Bill", "Index Copy", "Other"];
+  if (!allowedTypes.includes(documentType)) {
+    throw new ApiError(422, "Please select a valid owner proof document type");
+  }
+  if (!files.length) {
+    throw new ApiError(422, "Please upload at least one owner proof");
+  }
+
+  const results = await Promise.all(files.map((file) => uploadOwnerProofBuffer(file)));
+  res.status(201).json({
+    success: true,
+    data: files.map((file, index) => {
+      const result = results[index];
+      return {
+        documentType,
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+        resourceType: result.resource_type,
+        format: result.format || "",
+        size: file.size,
+        url: cloudinary.url(result.public_id, {
+          secure: true,
+          sign_url: true,
+          type: "authenticated",
+          resource_type: result.resource_type,
+          format: result.format || undefined,
+        }),
+        publicId: result.public_id,
+        status: "uploaded",
+        uploadedAt: new Date().toISOString(),
+      };
+    }),
+  });
 });

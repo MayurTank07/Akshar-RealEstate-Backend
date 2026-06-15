@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ALL_PERMISSION_VALUES } from "../config/permissions.js";
+import { PROPERTY_OPTION_GROUPS } from "../config/propertyOptionDefaults.js";
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, "Invalid id");
 const mediaString = z.string().min(1);
@@ -8,6 +9,13 @@ const assignableId = z.union([objectId, z.literal(""), z.null()]).optional().tra
 
 export const idParamSchema = z.object({
   params: z.object({ id: objectId }),
+});
+
+export const propertyOptionCreateSchema = z.object({
+  body: z.object({
+    group: z.enum(PROPERTY_OPTION_GROUPS),
+    value: z.string().trim().min(1, "Option value is required").max(80),
+  }),
 });
 
 export const staffLoginSchema = z.object({
@@ -30,6 +38,12 @@ export const userLoginSchema = z.object({
   body: z.object({
     email: z.string().email(),
     password: z.string().min(6),
+  }),
+});
+
+export const userGoogleAuthSchema = z.object({
+  body: z.object({
+    credential: z.string().trim().min(20, "Google credential is required"),
   }),
 });
 
@@ -94,16 +108,16 @@ export const propertySchema = z.object({
     measurement: z
       .object({
         value: z.coerce.number().min(0).optional().default(0),
-        unit: z.enum(["sqft", "vigha", "acre", "sq-yard", "sq-meter", "guntha", "hectare", "custom"]).optional().default("sqft"),
+        unit: z.string().trim().min(1).optional().default("sqft"),
         customUnit: z.string().optional().default(""),
       })
       .optional()
       .default({ value: 0, unit: "sqft", customUnit: "" }),
     area: z.string().optional().default(""),
-    tag: z.enum(["Featured", "New", "Hot", "Standard"]).default("Standard"),
+    tag: z.string().trim().min(1).default("Standard"),
     badge: z.string().optional().default(""),
     badgeColor: z.string().optional().default("bg-blue-600"),
-    status: z.enum(["active", "pending", "inactive", "sold", "rented"]).default("active"),
+    status: z.string().trim().min(1).transform((value) => value.toLowerCase()).default("active"),
     propertyStatus: z.string().optional().default("Ready"),
     category: z.string().optional().default(""),
     availability: z.string().optional().default(""),
@@ -111,6 +125,7 @@ export const propertySchema = z.object({
     possessionStatus: z.string().optional().default(""),
     brokerageType: z.string().optional().default(""),
     facing: z.string().optional().default(""),
+    ownership: z.string().optional().default(""),
     visibility: z.enum(["public", "private"]).optional().default("public"),
     featured: z.coerce.boolean().optional().default(false),
     ownerName: z.string().optional().default("Akshar Estate"),
@@ -215,6 +230,7 @@ export const enquiryUpdateSchema = z.object({
     commissionAmount: z.coerce.number().min(0).optional(),
     paymentDetails: z.string().optional(),
     closingDate: z.union([z.coerce.date(), z.literal(""), z.null()]).optional(),
+    followUpDate: z.union([z.coerce.date(), z.literal(""), z.null()]).optional(),
     remarks: z.string().optional(),
   }),
 });
@@ -230,6 +246,7 @@ export const staffCreateSchema = z.object({
     phone: z.string().optional().default(""),
     designation: z.string().optional().default(""),
     avatar: z.string().optional().default(""),
+    coverImage: z.string().optional().default(""),
     permissions: permissionSchema,
     status: z.enum(["active", "disabled"]).optional().default("active"),
     propertiesManaged: z.coerce.number().int().min(0).optional().default(0),
@@ -246,6 +263,19 @@ export const ownerStatusSchema = z.object({
   body: z.object({
     status: z.enum(["pending", "approved", "rejected", "needs_changes"]),
     remarks: z.string().optional().default(""),
+  }),
+});
+
+export const ownerDeleteRequestSchema = z.object({
+  body: z.object({
+    reason: z.string().trim().min(5, "Delete request reason is required"),
+  }),
+});
+
+export const ownerDeleteReviewSchema = z.object({
+  body: z.object({
+    deleteStatus: z.enum(["approved", "rejected"]),
+    remarks: z.string().trim().optional().default(""),
   }),
 });
 
@@ -275,6 +305,14 @@ const ownerPropertyDetailsSchema = z.object({
   parking: z.string().trim().optional().default(""),
   facing: z.string().trim().optional().default(""),
   ageOfProperty: z.string().trim().optional().default(""),
+  constructionYear: z.coerce
+    .number()
+    .int()
+    .min(1900)
+    .max(new Date().getFullYear())
+    .optional()
+    .nullable()
+    .default(null),
   expectedPrice: z.coerce.number().min(1, "Expected price/rent is required"),
   negotiable: z.coerce.boolean().optional().default(false),
   maintenanceCharges: z.coerce.number().min(0).optional().default(0),
@@ -310,12 +348,50 @@ export const ownerRequestSchema = z.object({
     propertyDetails: ownerPropertyDetailsSchema,
     media: z
       .object({
-        photos: z.array(z.string().trim().min(1)).min(1, "At least one property photo is required"),
+        photos: z.array(z.string().trim().min(1)).min(4, "At least 4 property photos are required").max(10, "Maximum 10 property photos are allowed"),
         videos: z.array(z.string().trim().min(1)).optional().default([]),
         documents: z.array(z.string().trim().min(1)).optional().default([]),
+        ownerProofs: z
+          .array(
+            z.object({
+              documentType: z.enum(["Ownership Proof", "Electricity Bill", "Tax Bill", "Index Copy", "Other"]),
+              originalName: z.string().trim().min(1),
+              mimeType: z.string().trim().min(1),
+              resourceType: z.string().trim().optional().default("image"),
+              format: z.string().trim().optional().default(""),
+              size: z.coerce.number().min(0).optional().default(0),
+              url: z.string().trim().min(1),
+              publicId: z.string().trim().optional().default(""),
+              status: z.enum(["uploaded", "verified", "rejected"]).optional().default("uploaded"),
+              uploadedAt: z.union([z.coerce.date(), z.string()]).optional(),
+            })
+          )
+          .min(1, "At least one owner proof document is required"),
       })
-      .default({ photos: [], videos: [], documents: [] }),
+      .default({ photos: [], videos: [], documents: [], ownerProofs: [] }),
     declaration: ownerDeclarationSchema.refine((value) => Object.values(value).every(Boolean), "All declaration checkboxes must be accepted"),
+  }),
+});
+
+export const ownerAdminUpdateSchema = z.object({
+  body: z.object({
+    ownerDetails: z
+      .object({
+        name: z.string().trim().min(2).optional(),
+        email: z.string().email().optional(),
+        phone: z.string().trim().min(8).optional(),
+        alternatePhone: z.string().trim().optional(),
+        ownershipType: z.string().trim().min(2).optional(),
+      })
+      .optional(),
+    propertyDetails: ownerPropertyDetailsSchema.partial().optional(),
+    media: z
+      .object({
+        photos: z.array(z.string().trim().min(1)).optional(),
+        videos: z.array(z.string().trim().min(1)).optional(),
+        documents: z.array(z.string().trim().min(1)).optional(),
+      })
+      .optional(),
   }),
 });
 

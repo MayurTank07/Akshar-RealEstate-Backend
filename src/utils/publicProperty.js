@@ -1,0 +1,111 @@
+const DEFAULT_PUBLIC_BROKER = {
+  name: "Akshar Estate Expert",
+  phone: "+91 1800-123-4567",
+  designation: "Real Estate Expert",
+  avatar: "",
+};
+
+const PUBLIC_PROPERTY_FIELDS = [
+  "_id",
+  "id",
+  "title",
+  "location",
+  "city",
+  "type",
+  "dealType",
+  "developerName",
+  "topProject",
+  "topDeveloper",
+  "price",
+  "priceAmount",
+  "priceUnit",
+  "beds",
+  "baths",
+  "sqft",
+  "measurement",
+  "area",
+  "tag",
+  "badge",
+  "badgeColor",
+  "status",
+  "propertyStatus",
+  "category",
+  "availability",
+  "constructionStatus",
+  "possessionStatus",
+  "facing",
+  "ownership",
+  "featured",
+  "image",
+  "gallery",
+  "description",
+  "videoUrl",
+  "amenities",
+  "features",
+  "facilities",
+  "highlights",
+  "parking",
+  "floorNumber",
+  "totalFloors",
+  "furnishing",
+  "ageOfProperty",
+  "propertyTags",
+  "isPreLeased",
+  "isBarter",
+  "roi",
+  "yearBuilt",
+  "propertyCode",
+  "source",
+  "createdAt",
+  "updatedAt",
+];
+
+function plainObject(value) {
+  return typeof value?.toObject === "function" ? value.toObject() : value || {};
+}
+
+function pick(source, keys) {
+  return Object.fromEntries(keys.filter((key) => source[key] !== undefined).map((key) => [key, source[key]]));
+}
+
+function publicBroker(property) {
+  const staff = plainObject(property.assignedTo || property.createdBy);
+  return {
+    name: staff.name || DEFAULT_PUBLIC_BROKER.name,
+    phone: staff.phone || DEFAULT_PUBLIC_BROKER.phone,
+    designation: staff.designation || DEFAULT_PUBLIC_BROKER.designation,
+    avatar: staff.avatar || DEFAULT_PUBLIC_BROKER.avatar,
+  };
+}
+
+export function publicPropertyView(value) {
+  const property = plainObject(value);
+  const safe = pick(property, PUBLIC_PROPERTY_FIELDS);
+  const map = plainObject(property.map);
+  safe.map = {
+    area: map.area || property.location || "",
+    city: map.city || property.city || "",
+    state: map.state || "",
+  };
+  safe.broker = publicBroker(property);
+  return safe;
+}
+
+export function sanitizeWishlistProperty(value) {
+  const property = plainObject(value);
+  const safe = pick(property, PUBLIC_PROPERTY_FIELDS);
+  const broker = plainObject(property.broker);
+  const map = plainObject(property.map);
+  safe.map = {
+    area: map.area || property.location || "",
+    city: map.city || property.city || "",
+    state: map.state || "",
+  };
+  safe.broker = {
+    name: broker.name || DEFAULT_PUBLIC_BROKER.name,
+    phone: broker.phone || DEFAULT_PUBLIC_BROKER.phone,
+    designation: broker.designation || DEFAULT_PUBLIC_BROKER.designation,
+    avatar: broker.avatar || DEFAULT_PUBLIC_BROKER.avatar,
+  };
+  return safe;
+}

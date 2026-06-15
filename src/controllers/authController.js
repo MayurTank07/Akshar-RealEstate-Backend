@@ -3,8 +3,10 @@ import { DEFAULT_SUPERVISOR_PERMISSIONS } from "../config/permissions.js";
 import { env } from "../config/env.js";
 import { Staff } from "../models/Staff.js";
 import { User } from "../models/User.js";
+import { Property } from "../models/Property.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { publicPropertyView, sanitizeWishlistProperty } from "../utils/publicProperty.js";
 
 function signToken(staff) {
   return jwt.sign({ sub: staff._id.toString(), role: staff.role, version: staff.tokenVersion || 0 }, env.jwtSecret, {
@@ -28,6 +30,7 @@ function staffPayload(staff) {
     phone: staff.phone,
     designation: staff.designation,
     avatar: staff.avatar,
+    coverImage: staff.coverImage,
     permissions: staff.role === "admin" ? [] : staff.permissions?.length ? staff.permissions : DEFAULT_SUPERVISOR_PERMISSIONS,
     propertiesManaged: staff.propertiesManaged,
   };
@@ -42,7 +45,8 @@ function userPayload(user) {
     role: user.role,
     status: user.status,
     avatar: user.avatar,
-    savedProperties: user.savedProperties || [],
+    authProvider: user.authProvider || "local",
+    savedProperties: (user.savedProperties || []).map(sanitizeWishlistProperty),
   };
 }
 
@@ -145,6 +149,68 @@ export const userLogin = asyncHandler(async (req, res) => {
   res.json({ success: true, token: signUserToken(user), user: userPayload(user) });
 });
 
+async function verifyGoogleCredential(credential) {
+  if (!env.googleClientId) {
+    throw new ApiError(503, "Google login is not configured");
+  }
+
+  let response;
+  try {
+    response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+  } catch {
+    throw new ApiError(502, "Unable to verify Google login right now");
+  }
+
+  const profile = await response.json().catch(() => null);
+  if (!response.ok || !profile) {
+    throw new ApiError(401, profile?.error_description || "Invalid Google credential");
+  }
+
+  if (profile.aud !== env.googleClientId) {
+    throw new ApiError(401, "Google credential was not issued for this application");
+  }
+
+  if (profile.email_verified !== "true" && profile.email_verified !== true) {
+    throw new ApiError(401, "Google email is not verified");
+  }
+
+  if (!profile.email) {
+    throw new ApiError(401, "Google account email is required");
+  }
+
+  return {
+    googleId: profile.sub,
+    email: profile.email.toLowerCase(),
+    name: profile.name || profile.email.split("@")[0],
+    avatar: profile.picture || "",
+  };
+}
+
+export const userGoogleAuth = asyncHandler(async (req, res) => {
+  const profile = await verifyGoogleCredential(req.validated.body.credential);
+  let user = await User.findOne({ email: profile.email });
+
+  if (user) {
+    if (user.status !== "active") throw new ApiError(403, "This account is disabled");
+    user.googleId = user.googleId || profile.googleId;
+    user.avatar = user.avatar || profile.avatar;
+    user.lastLoginAt = new Date();
+    await user.save();
+  } else {
+    user = await User.create({
+      name: profile.name,
+      email: profile.email,
+      avatar: profile.avatar,
+      googleId: profile.googleId,
+      authProvider: "google",
+      role: "owner",
+      lastLoginAt: new Date(),
+    });
+  }
+
+  res.json({ success: true, token: signUserToken(user), user: userPayload(user) });
+});
+
 export const userMe = asyncHandler(async (req, res) => {
   res.json({ success: true, user: userPayload(req.ownerUser) });
 });
@@ -155,19 +221,27 @@ export const userLogout = asyncHandler(async (req, res) => {
 });
 
 export const listUserWishlist = asyncHandler(async (req, res) => {
-  res.json({ success: true, data: req.ownerUser.savedProperties || [] });
+  res.json({ success: true, data: (req.ownerUser.savedProperties || []).map(sanitizeWishlistProperty) });
 });
 
 export const saveUserWishlistProperty = asyncHandler(async (req, res) => {
   const user = await User.findById(req.ownerUser._id);
   if (!user) throw new ApiError(404, "User account not found");
 
-  const property = {
+  const requestedProperty = {
     ...req.validated.body,
     source: req.validated.body.source || "property",
   };
+  const dbProperty = /^[a-f\d]{24}$/i.test(requestedProperty._id || "")
+    ? await Property.findById(requestedProperty._id)
+      .populate("assignedTo", "name phone designation avatar role")
+      .populate("createdBy", "name phone designation avatar role")
+    : null;
+  const property = dbProperty
+    ? { ...publicPropertyView(dbProperty), source: requestedProperty.source }
+    : sanitizeWishlistProperty(requestedProperty);
   const key = savedKey(property);
-  const current = user.savedProperties || [];
+  const current = (user.savedProperties || []).map(sanitizeWishlistProperty);
   const exists = current.some((item) => savedKey(item) === key);
 
   if (!exists) {
@@ -175,7 +249,7 @@ export const saveUserWishlistProperty = asyncHandler(async (req, res) => {
     await user.save();
   }
 
-  res.json({ success: true, data: user.savedProperties || [], saved: true });
+  res.json({ success: true, data: (user.savedProperties || []).map(sanitizeWishlistProperty), saved: true });
 });
 
 export const removeUserWishlistProperty = asyncHandler(async (req, res) => {
@@ -186,5 +260,5 @@ export const removeUserWishlistProperty = asyncHandler(async (req, res) => {
   user.savedProperties = (user.savedProperties || []).filter((item) => savedKey(item) !== key);
   await user.save();
 
-  res.json({ success: true, data: user.savedProperties || [], saved: false });
+  res.json({ success: true, data: (user.savedProperties || []).map(sanitizeWishlistProperty), saved: false });
 });

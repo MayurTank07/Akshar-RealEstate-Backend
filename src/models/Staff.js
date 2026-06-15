@@ -13,6 +13,7 @@ const staffSchema = new mongoose.Schema(
     phone: { type: String, trim: true, default: "" },
     designation: { type: String, trim: true, default: "" },
     avatar: { type: String, trim: true, default: "" },
+    coverImage: { type: String, trim: true, default: "" },
     permissions: {
       type: [{ type: String, trim: true }],
       default() {

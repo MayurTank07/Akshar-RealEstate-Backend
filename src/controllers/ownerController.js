@@ -38,6 +38,7 @@ function buildOwnerPayload(body, user, previous = null) {
       photos: media.photos || [],
       videos: media.videos || [],
       documents: media.documents || [],
+      ownerProofs: media.ownerProofs || [],
     },
     declaration,
     declarationAccepted: true,
@@ -79,6 +80,8 @@ async function createActivity({ title, description, category, priority = "normal
       city: request.propertyDetails?.city,
       area: request.propertyDetails?.area,
       status: request.status,
+      deleteStatus: request.deleteStatus,
+      deleteReason: request.deleteReason,
       approvedPropertyId: request.approvedPropertyId,
     },
     actorName,
@@ -120,11 +123,12 @@ function mapRequestToProperty(request, reviewer) {
     totalFloors: details.totalFloors || "",
     furnishing: details.furnishing || "",
     ageOfProperty: details.ageOfProperty || "",
+    yearBuilt: details.constructionYear || null,
     facing: details.facing || "",
     contact: {
-      name: request.name,
-      phone: request.phone,
-      email: request.email,
+      name: staffName(reviewer),
+      phone: reviewer.phone || "",
+      email: reviewer.email || "",
     },
     map: {
       address: details.map?.address || details.address || "",
@@ -140,6 +144,7 @@ function mapRequestToProperty(request, reviewer) {
     ownerUserId: request.ownerUserId,
     ownerRequestId: request._id,
     source: "seller_owner",
+    assignedTo: reviewer._id,
     createdBy: reviewer._id,
     updatedBy: reviewer._id,
   };
@@ -147,16 +152,38 @@ function mapRequestToProperty(request, reviewer) {
 
 async function approveRequest(request, reviewer) {
   if (request.approvedPropertyId) return request.approvedPropertyId;
-  const propertyBody = mapRequestToProperty(request, reviewer);
-  propertyBody.propertyCode = await generatePropertyCode(propertyBody.city || propertyBody.location);
-  const property = await Property.create(propertyBody);
-  await syncPropertyCodeCounter(property.propertyCode);
-  return property._id;
+
+  const lockedRequest = await OwnerApplication.findOneAndUpdate(
+    { _id: request._id, approvedPropertyId: null, approvalInProgress: { $ne: true } },
+    { $set: { approvalInProgress: true } },
+    { new: true }
+  );
+
+  if (!lockedRequest) {
+    const latest = await OwnerApplication.findById(request._id).select("approvedPropertyId approvalInProgress");
+    if (latest?.approvedPropertyId) return latest.approvedPropertyId;
+    throw new ApiError(409, "This owner request is already being approved. Please refresh and try again.");
+  }
+
+  try {
+    const propertyBody = mapRequestToProperty(lockedRequest, reviewer);
+    propertyBody.propertyCode = await generatePropertyCode(propertyBody.city || propertyBody.location);
+    const property = await Property.create(propertyBody);
+    await syncPropertyCodeCounter(property.propertyCode);
+    await OwnerApplication.updateOne(
+      { _id: lockedRequest._id },
+      { $set: { approvedPropertyId: property._id, approvalInProgress: false } }
+    );
+    return property._id;
+  } catch (error) {
+    await OwnerApplication.updateOne({ _id: lockedRequest._id }, { $set: { approvalInProgress: false } });
+    throw error;
+  }
 }
 
 export const listMyOwnerRequests = asyncHandler(async (req, res) => {
   const requests = await OwnerApplication.find({ ownerUserId: req.ownerUser._id })
-    .populate("approvedPropertyId", "title propertyCode status city location image")
+    .populate("approvedPropertyId", "title propertyCode status visibility city location image")
     .sort({ createdAt: -1 });
   res.json({ success: true, data: requests });
 });
@@ -193,6 +220,7 @@ export const updateMyOwnerRequest = asyncHandler(async (req, res) => {
   const request = await OwnerApplication.findOne({ _id: req.validated.params.id, ownerUserId: req.ownerUser._id });
   if (!request) throw new ApiError(404, "Owner property request not found");
   if (request.status === "approved") throw new ApiError(403, "Approved properties cannot be edited from this form");
+  if (request.approvalInProgress) throw new ApiError(409, "This property is currently under approval review. Please try again shortly.");
 
   const payload = buildOwnerPayload(req.validated.body, req.ownerUser, request);
   Object.assign(request, payload);
@@ -219,8 +247,83 @@ export const updateMyOwnerRequest = asyncHandler(async (req, res) => {
   res.json({ success: true, data: request });
 });
 
+export const deleteMyOwnerRequest = asyncHandler(async (req, res) => {
+  const request = await OwnerApplication.findOne({ _id: req.validated.params.id, ownerUserId: req.ownerUser._id }).populate("approvedPropertyId", "status title");
+  if (!request) throw new ApiError(404, "Owner property request not found");
+  if (request.approvalInProgress) throw new ApiError(409, "This property is currently under approval review. Please try again shortly.");
+  if (request.approvedPropertyId?.status === "sold") {
+    throw new ApiError(400, "This property has already been sold and cannot be deleted.");
+  }
+  if (request.status !== "pending" || request.approvedPropertyId) {
+    throw new ApiError(400, "Only pending owner submissions can be deleted directly. Request deletion for approved/live properties.");
+  }
+
+  await createActivity({
+    title: "Owner deleted pending property",
+    description: `${request.name} deleted ${request.propertyDetails.title}`,
+    category: "owner-delete",
+    priority: "normal",
+    status: "deleted",
+    request,
+    actorName: request.name,
+    targets: await ownerManagementTargets(),
+  });
+
+  await request.deleteOne();
+  res.json({ success: true, data: { id: req.validated.params.id, deleted: true } });
+});
+
+export const requestOwnerPropertyDelete = asyncHandler(async (req, res) => {
+  const { reason } = req.validated.body;
+  const request = await OwnerApplication.findOne({ _id: req.validated.params.id, ownerUserId: req.ownerUser._id }).populate("approvedPropertyId", "status visibility title");
+  if (!request) throw new ApiError(404, "Owner property request not found");
+  if (request.approvalInProgress) throw new ApiError(409, "This property is currently under approval review. Please try again shortly.");
+  if (request.approvedPropertyId?.status === "sold") {
+    throw new ApiError(400, "This property has already been sold and cannot be deleted.");
+  }
+  if (request.status !== "approved" || !request.approvedPropertyId) {
+    throw new ApiError(400, "Only approved/live properties can use the delete request flow.");
+  }
+  if (request.deleteStatus === "pending") {
+    throw new ApiError(409, "A delete request is already waiting for review.");
+  }
+  if (request.deleteStatus === "approved" || request.approvedPropertyId.visibility === "private") {
+    throw new ApiError(400, "This property has already been removed from public listings.");
+  }
+
+  request.deleteStatus = "pending";
+  request.deleteReason = reason;
+  request.deleteRequestedAt = new Date();
+  request.deleteReviewedBy = null;
+  request.deleteReviewedAt = null;
+  request.deleteReviewRemarks = "";
+  request.statusHistory.push({
+    status: "delete_requested",
+    remarks: reason,
+    changedByName: req.ownerUser.name,
+    changedByRole: "owner",
+    changedAt: new Date(),
+  });
+  await request.save();
+
+  await createActivity({
+    title: "Owner requested property delete",
+    description: `${request.name} requested deletion for ${request.propertyDetails.title}`,
+    category: "owner-delete",
+    priority: "high",
+    status: "delete_requested",
+    request,
+    actorName: request.name,
+    targets: await ownerManagementTargets(),
+  });
+
+  const populated = await OwnerApplication.findById(request._id).populate("approvedPropertyId", "title propertyCode status visibility city location image");
+  res.json({ success: true, data: populated });
+});
+
 export const listOwners = asyncHandler(async (req, res) => {
   const filter = {};
+  if (req.query.deleteStatus && req.query.deleteStatus !== "all") filter.deleteStatus = req.query.deleteStatus;
   if (req.query.status && req.query.status !== "all") filter.status = req.query.status;
   if (req.query.city && req.query.city !== "all") filter["propertyDetails.city"] = new RegExp(escapeRegExp(req.query.city), "i");
   if (req.query.type && req.query.type !== "all") filter["propertyDetails.type"] = new RegExp(`^${escapeRegExp(req.query.type)}$`, "i");
@@ -239,10 +342,65 @@ export const listOwners = asyncHandler(async (req, res) => {
 
   const owners = await OwnerApplication.find(filter)
     .populate("ownerUserId", "name email phone")
-    .populate("reviewedBy", "name role")
-    .populate("approvedPropertyId", "title propertyCode status city location")
+    .populate("reviewedBy", "name role phone email designation avatar")
+    .populate("deleteReviewedBy", "name role")
+    .populate("approvedPropertyId", "title propertyCode status visibility city location")
     .sort({ createdAt: -1 });
   res.json({ success: true, data: owners });
+});
+
+export const updateOwnerContent = asyncHandler(async (req, res) => {
+  const owner = await OwnerApplication.findById(req.validated.params.id);
+  if (!owner) throw new ApiError(404, "Owner property request not found");
+  if (owner.approvalInProgress) throw new ApiError(409, "This property is currently under approval review.");
+
+  const { ownerDetails, propertyDetails, media } = req.validated.body;
+  if (ownerDetails) {
+    if (ownerDetails.name !== undefined) owner.name = ownerDetails.name;
+    if (ownerDetails.email !== undefined) owner.email = ownerDetails.email.toLowerCase();
+    if (ownerDetails.phone !== undefined) owner.phone = ownerDetails.phone;
+    if (ownerDetails.alternatePhone !== undefined) owner.alternatePhone = ownerDetails.alternatePhone;
+    if (ownerDetails.ownershipType !== undefined) owner.ownershipType = ownerDetails.ownershipType;
+  }
+  if (propertyDetails) Object.assign(owner.propertyDetails, propertyDetails);
+  if (media) {
+    if (media.photos !== undefined) owner.media.photos = media.photos;
+    if (media.videos !== undefined) owner.media.videos = media.videos;
+    if (media.documents !== undefined) owner.media.documents = media.documents;
+  }
+  owner.statusHistory.push({
+    status: "content_updated",
+    remarks: "Submission content updated internally",
+    changedByName: staffName(req.user),
+    changedByRole: req.user.role,
+    changedAt: new Date(),
+  });
+  await owner.save();
+
+  if (owner.approvedPropertyId) {
+    const property = await Property.findById(owner.approvedPropertyId);
+    const approvingStaff = await Staff.findById(owner.reviewedBy || property?.assignedTo || property?.createdBy);
+    if (property && approvingStaff) {
+      const mapped = mapRequestToProperty(owner, approvingStaff);
+      const editableKeys = [
+        "title", "location", "city", "area", "type", "dealType", "price", "priceAmount", "beds", "sqft", "measurement",
+        "propertyStatus", "availability", "image", "gallery", "videoUrl", "description", "amenities", "parking", "floorNumber",
+        "totalFloors", "furnishing", "ageOfProperty", "yearBuilt", "facing", "map",
+      ];
+      editableKeys.forEach((key) => {
+        property[key] = mapped[key];
+      });
+      property.updatedBy = req.user._id;
+      await property.save();
+    }
+  }
+
+  const populated = await OwnerApplication.findById(owner._id)
+    .populate("ownerUserId", "name email phone")
+    .populate("reviewedBy", "name role phone email designation avatar")
+    .populate("deleteReviewedBy", "name role")
+    .populate("approvedPropertyId", "title propertyCode status visibility city location");
+  res.json({ success: true, data: populated });
 });
 
 export const updateOwnerStatus = asyncHandler(async (req, res) => {
@@ -252,6 +410,9 @@ export const updateOwnerStatus = asyncHandler(async (req, res) => {
 
   if (["rejected", "needs_changes"].includes(status) && !remarks.trim()) {
     throw new ApiError(400, "Remarks are required when rejecting or requesting changes");
+  }
+  if (owner.status === "approved" && status !== "approved") {
+    throw new ApiError(400, "Approved owner requests cannot be moved back from this screen. Update the listed property instead.");
   }
 
   let approvedPropertyId = owner.approvedPropertyId;
@@ -264,6 +425,7 @@ export const updateOwnerStatus = asyncHandler(async (req, res) => {
   owner.reviewedBy = req.user._id;
   owner.reviewedAt = new Date();
   owner.approvedPropertyId = approvedPropertyId || null;
+  owner.approvalInProgress = false;
   owner.statusHistory.push({
     status,
     remarks: owner.reviewRemarks,
@@ -287,8 +449,64 @@ export const updateOwnerStatus = asyncHandler(async (req, res) => {
 
   const populated = await OwnerApplication.findById(owner._id)
     .populate("ownerUserId", "name email phone")
-    .populate("reviewedBy", "name role")
-    .populate("approvedPropertyId", "title propertyCode status city location");
+    .populate("reviewedBy", "name role phone email designation avatar")
+    .populate("deleteReviewedBy", "name role")
+    .populate("approvedPropertyId", "title propertyCode status visibility city location");
+
+  res.json({ success: true, data: populated });
+});
+
+export const reviewOwnerDeleteRequest = asyncHandler(async (req, res) => {
+  const { deleteStatus, remarks } = req.validated.body;
+  const owner = await OwnerApplication.findById(req.validated.params.id).populate("approvedPropertyId");
+  if (!owner) throw new ApiError(404, "Owner property request not found");
+  if (owner.deleteStatus !== "pending") throw new ApiError(400, "There is no pending delete request for this owner property.");
+  if (deleteStatus === "rejected" && !remarks.trim()) throw new ApiError(400, "Remarks are required when rejecting a delete request.");
+  if (!owner.approvedPropertyId) throw new ApiError(404, "Approved linked property not found");
+  if (owner.approvedPropertyId.status === "sold") {
+    throw new ApiError(400, "This property has already been sold and cannot be deleted.");
+  }
+
+  if (deleteStatus === "approved") {
+    owner.approvedPropertyId.visibility = "private";
+    owner.approvedPropertyId.status = "inactive";
+    owner.approvedPropertyId.statusUpdatedAt = new Date();
+    owner.approvedPropertyId.statusUpdatedBy = req.user._id;
+    owner.approvedPropertyId.statusRemarks = remarks || "Owner delete request approved";
+    owner.approvedPropertyId.updatedBy = req.user._id;
+    await owner.approvedPropertyId.save();
+  }
+
+  owner.deleteStatus = deleteStatus;
+  owner.deleteReviewRemarks = remarks || (deleteStatus === "approved" ? "Delete request approved and listing removed from website" : "");
+  owner.deleteReviewedBy = req.user._id;
+  owner.deleteReviewedAt = new Date();
+  owner.statusHistory.push({
+    status: `delete_${deleteStatus}`,
+    remarks: owner.deleteReviewRemarks || owner.deleteReason,
+    changedByName: staffName(req.user),
+    changedByRole: req.user.role,
+    changedAt: new Date(),
+  });
+  await owner.save();
+
+  await createActivity({
+    title: `Owner delete request ${deleteStatus}`,
+    description: `${owner.propertyDetails.title} delete request ${deleteStatus}`,
+    category: "owner-delete",
+    priority: deleteStatus === "approved" ? "high" : "normal",
+    status: `delete_${deleteStatus}`,
+    request: owner,
+    actorName: staffName(req.user),
+    actorId: req.user._id,
+    targets: await ownerManagementTargets(),
+  });
+
+  const populated = await OwnerApplication.findById(owner._id)
+    .populate("ownerUserId", "name email phone")
+    .populate("reviewedBy", "name role phone email designation avatar")
+    .populate("deleteReviewedBy", "name role")
+    .populate("approvedPropertyId", "title propertyCode status visibility city location");
 
   res.json({ success: true, data: populated });
 });
