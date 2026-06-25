@@ -39,6 +39,27 @@ app.use(
   })
 );
 
+app.use(
+  "/api/admin/uploads",
+  rateLimit({
+    windowMs: 60 * 1000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: "Too many upload requests. Please wait before uploading again." },
+  })
+);
+app.use(
+  ["/api/public/owner/uploads", "/api/public/owner/proofs"],
+  rateLimit({
+    windowMs: 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: "Too many upload requests. Please wait before uploading again." },
+  })
+);
+
 app.get("/health", (_req, res) => {
   res.json({ success: true, status: "ok" });
 });

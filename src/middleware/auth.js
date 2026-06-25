@@ -16,9 +16,13 @@ export const authenticate = asyncHandler(async (req, _res, next) => {
 
   let decoded;
   try {
-    decoded = jwt.verify(token, env.jwtSecret);
+    decoded = jwt.verify(token, env.jwtSecret, { algorithms: ["HS256"] });
   } catch {
     throw new ApiError(401, "Invalid or expired session");
+  }
+
+  if (decoded.kind !== "staff") {
+    throw new ApiError(401, "Invalid staff session");
   }
 
   const staff = await Staff.findById(decoded.sub).select("-passwordHash");
@@ -44,7 +48,7 @@ export const authenticateUser = asyncHandler(async (req, _res, next) => {
 
   let decoded;
   try {
-    decoded = jwt.verify(token, env.jwtSecret);
+    decoded = jwt.verify(token, env.jwtSecret, { algorithms: ["HS256"] });
   } catch {
     throw new ApiError(401, "Invalid or expired session");
   }

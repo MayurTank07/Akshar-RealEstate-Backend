@@ -1,11 +1,12 @@
 import { User } from "../models/User.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { escapeRegExp } from "../utils/escapeRegExp.js";
+import { parsePagination } from "../utils/pagination.js";
+
+const USER_SORT_FIELDS = ["createdAt", "name", "email", "status", "lastLoginAt"];
 
 export const listUsers = asyncHandler(async (req, res) => {
-  const page = Math.max(1, parseInt(req.query.page) || 1);
-  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
-  const skip = (page - 1) * limit;
   const search = req.query.search?.trim() || "";
   const authProvider = req.query.authProvider || "";
   const status = req.query.status || "";
@@ -16,10 +17,11 @@ export const listUsers = asyncHandler(async (req, res) => {
   const filter = {};
 
   if (search) {
+    const safeSearch = escapeRegExp(search);
     filter.$or = [
-      { name: { $regex: search, $options: "i" } },
-      { email: { $regex: search, $options: "i" } },
-      { phone: { $regex: search, $options: "i" } },
+      { name: { $regex: safeSearch, $options: "i" } },
+      { email: { $regex: safeSearch, $options: "i" } },
+      { phone: { $regex: safeSearch, $options: "i" } },
     ];
   }
   if (authProvider) filter.authProvider = authProvider;
@@ -35,10 +37,11 @@ export const listUsers = asyncHandler(async (req, res) => {
     }
   }
 
+  const { page, limit, skip, sort } = parsePagination(req.query, { allowedSortFields: USER_SORT_FIELDS });
   const [users, total] = await Promise.all([
     User.find(filter)
       .select("-passwordHash -savedProperties -tokenVersion -googleId")
-      .sort({ createdAt: -1 })
+      .sort(sort)
       .skip(skip)
       .limit(limit),
     User.countDocuments(filter),
@@ -72,10 +75,7 @@ export const userStats = asyncHandler(async (_req, res) => {
 });
 
 export const updateUserStatus = asyncHandler(async (req, res) => {
-  const { status } = req.body;
-  if (!["active", "disabled"].includes(status)) {
-    throw new ApiError(400, "Status must be 'active' or 'disabled'");
-  }
+  const { status } = req.validated.body;
 
   const user = await User.findById(req.validated.params.id);
   if (!user) throw new ApiError(404, "User not found");

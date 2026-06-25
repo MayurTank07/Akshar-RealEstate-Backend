@@ -6,6 +6,7 @@ import { Property } from "../models/Property.js";
 import { Staff } from "../models/Staff.js";
 import { buildSoldRentedRows, summarizeSoldRentedRows } from "../services/conversionReportService.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { escapeRegExp } from "../utils/escapeRegExp.js";
 import { dateMatch, formatCrores, getDateRange } from "../utils/reporting.js";
 
 function objectId(value) {
@@ -17,16 +18,16 @@ function propertyScope(user, query = {}) {
   if (query.supervisorId && query.supervisorId !== "all" && user.role === "admin") {
     filter.$or = [{ assignedTo: objectId(query.supervisorId) }, { createdBy: objectId(query.supervisorId) }].filter((item) => item.assignedTo || item.createdBy);
   }
-  if (query.city && query.city !== "all") filter.city = new RegExp(query.city, "i");
-  if (query.propertyType && query.propertyType !== "all") filter.type = new RegExp(`^${query.propertyType}$`, "i");
+  if (query.city && query.city !== "all") filter.city = new RegExp(escapeRegExp(query.city), "i");
+  if (query.propertyType && query.propertyType !== "all") filter.type = new RegExp(`^${escapeRegExp(query.propertyType)}$`, "i");
   return filter;
 }
 
 function enquiryScope(user, query = {}, dateField = "createdAt") {
   const filter = user.role === "admin" ? {} : { assignedTo: user._id };
   if (query.supervisorId && query.supervisorId !== "all" && user.role === "admin") filter.assignedTo = objectId(query.supervisorId);
-  if (query.city && query.city !== "all") filter.preferredLocation = new RegExp(query.city, "i");
-  if (query.propertyType && query.propertyType !== "all") filter.propertyType = new RegExp(`^${query.propertyType}$`, "i");
+  if (query.city && query.city !== "all") filter.preferredLocation = new RegExp(escapeRegExp(query.city), "i");
+  if (query.propertyType && query.propertyType !== "all") filter.propertyType = new RegExp(`^${escapeRegExp(query.propertyType)}$`, "i");
   if (query.propertyId && query.propertyId !== "all") filter.propertyId = objectId(query.propertyId);
   if (query.source && query.source !== "all") filter.source = query.source;
   if (query.conversionType && query.conversionType !== "all") {

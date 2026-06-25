@@ -2,13 +2,13 @@ import { Activity } from "../models/Activity.js";
 import { Property } from "../models/Property.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { parseINRAmount, parseMoneyToCrores } from "../utils/reporting.js";
+import { escapeRegExp } from "../utils/escapeRegExp.js";
+import { parsePagination } from "../utils/pagination.js";
+import { parseINRAmount } from "../utils/reporting.js";
 import { generatePropertyCode, previewPropertyCode, syncPropertyCodeCounter } from "../services/propertyCodeService.js";
 import { publicPropertyView } from "../utils/publicProperty.js";
 
-function escapeRegExp(value) {
-  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+const PROPERTY_SORT_FIELDS = ["createdAt", "updatedAt", "title", "city", "type", "status", "priceAmount"];
 
 const searchNumberWords = {
   zero: "0",
@@ -72,7 +72,6 @@ const SEARCH_FIELDS = [
   "highlights",
   "propertyTags",
   "measurement.unit",
-  "measurement.customUnit",
 ];
 
 function normalizeSearch(value = "") {
@@ -134,8 +133,8 @@ const listQuery = (query, { includePrivateSearch = true } = {}) => {
     if (query.availability === "sold") filter.status = "sold";
     if (query.availability === "rented") filter.status = "rented";
   }
-  if (query.city && query.city !== "all") filter.city = new RegExp(query.city, "i");
-  if (query.type && query.type !== "all") filter.type = new RegExp(`^${query.type}$`, "i");
+  if (query.city && query.city !== "all") filter.city = new RegExp(escapeRegExp(query.city), "i");
+  if (query.type && query.type !== "all") filter.type = new RegExp(`^${escapeRegExp(query.type)}$`, "i");
   if (query.source) filter.source = query.source;
   if (query.propertyCode && query.propertyCode !== "all") filter.propertyCode = new RegExp(escapeRegExp(query.propertyCode), "i");
   if (query.propertyId && query.propertyId !== "all") filter.propertyCode = new RegExp(escapeRegExp(query.propertyId), "i");
@@ -145,6 +144,15 @@ const listQuery = (query, { includePrivateSearch = true } = {}) => {
     const priceFilter = priceIntentFilter(search);
     const allFilters = [...tokenFilters, ...(priceFilter ? [priceFilter] : [])];
     if (allFilters.length) filter.$and = [...(filter.$and || []), ...allFilters];
+  }
+
+  const minPrice = Number(query.minPrice || 0);
+  const maxPrice = Number(query.maxPrice || 0);
+  if (minPrice || maxPrice) {
+    const priceRange = {};
+    if (minPrice) priceRange.$gte = Math.round(minPrice * 10_000_000);
+    if (maxPrice) priceRange.$lte = Math.round(maxPrice * 10_000_000);
+    filter.priceAmount = priceRange;
   }
 
   return filter;
@@ -204,11 +212,17 @@ function validateDealDetails(body, existing) {
 export const publicProperties = asyncHandler(async (req, res) => {
   const filter = listQuery({ ...req.query, status: req.query.status || "active" }, { includePrivateSearch: false });
   filter.visibility = { $ne: "private" };
-  const properties = await Property.find(filter)
-    .populate("assignedTo", "name phone designation avatar role")
-    .populate("createdBy", "name phone designation avatar role")
-    .sort({ createdAt: -1 });
-  res.json({ success: true, data: properties.map(publicPropertyView) });
+  const { page, limit, skip, sort } = parsePagination(req.query, { allowedSortFields: PROPERTY_SORT_FIELDS });
+  const [properties, total] = await Promise.all([
+    Property.find(filter)
+      .populate("assignedTo", "name phone designation avatar role")
+      .populate("createdBy", "name phone designation avatar role")
+      .sort(sort)
+      .skip(skip)
+      .limit(limit),
+    Property.countDocuments(filter),
+  ]);
+  res.json({ success: true, data: properties.map(publicPropertyView), pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 } });
 });
 
 export const publicProperty = asyncHandler(async (req, res) => {
@@ -220,18 +234,17 @@ export const publicProperty = asyncHandler(async (req, res) => {
 });
 
 export const listProperties = asyncHandler(async (req, res) => {
-  let properties = await Property.find({ ...listQuery(req.query), ...supervisorOwnershipFilter(req.user) })
-    .populate("assignedTo", "name email phone designation avatar role")
-    .sort({ createdAt: -1 });
-  const minPrice = Number(req.query.minPrice || 0);
-  const maxPrice = Number(req.query.maxPrice || 0);
-  if (minPrice || maxPrice) {
-    properties = properties.filter((property) => {
-      const crores = parseMoneyToCrores(property.price);
-      return (!minPrice || crores >= minPrice) && (!maxPrice || crores <= maxPrice);
-    });
-  }
-  res.json({ success: true, data: properties });
+  const filter = { ...listQuery(req.query), ...supervisorOwnershipFilter(req.user) };
+  const { page, limit, skip, sort } = parsePagination(req.query, { allowedSortFields: PROPERTY_SORT_FIELDS });
+  const [properties, total] = await Promise.all([
+    Property.find(filter)
+      .populate("assignedTo", "name email phone designation avatar role")
+      .sort(sort)
+      .skip(skip)
+      .limit(limit),
+    Property.countDocuments(filter),
+  ]);
+  res.json({ success: true, data: properties, pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 } });
 });
 
 export const getProperty = asyncHandler(async (req, res) => {

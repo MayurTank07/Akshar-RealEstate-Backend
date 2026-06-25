@@ -16,7 +16,7 @@ function cleanStaff(staff) {
 }
 
 export const listStaff = asyncHandler(async (_req, res) => {
-  const staff = await Staff.find().select("+passwordPlain -passwordHash").sort({ role: 1, createdAt: 1 });
+  const staff = await Staff.find().select("-passwordHash").sort({ role: 1, createdAt: 1 });
   const supervisorIds = staff.filter((item) => item.role === "supervisor").map((item) => item._id);
   const [propertyStats, enquiryStats, activityStats] = await Promise.all([
     Property.aggregate([
@@ -80,7 +80,6 @@ export const createStaff = asyncHandler(async (req, res) => {
   const staff = await Staff.create({
     ...body,
     passwordHash: await Staff.hashPassword(body.password),
-    passwordPlain: body.password,
   });
 
   res.status(201).json({ success: true, data: cleanStaff(staff) });
@@ -97,7 +96,6 @@ export const updateStaff = asyncHandler(async (req, res) => {
 
   if (body.password) {
     body.passwordHash = await Staff.hashPassword(body.password);
-    body.passwordPlain = body.password;
     delete body.password;
   }
   if (body.role === "admin") {

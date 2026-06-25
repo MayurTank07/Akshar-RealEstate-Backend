@@ -8,6 +8,16 @@ export function notFound(req, _res, next) {
 }
 
 export function errorHandler(error, _req, res, _next) {
+  if (error.name === "CastError") {
+    error.statusCode = 400;
+    error.message = "Invalid ID format";
+  }
+  if (error.code === 11000) {
+    error.statusCode = 409;
+    const field = Object.keys(error.keyValue || {})[0] || "field";
+    error.message = `A record with this ${field} already exists`;
+  }
+
   const statusCode = error.statusCode || (error.name === "ZodError" || error.name === "ValidationError" ? 422 : error.code === "LIMIT_FILE_SIZE" || error.type === "entity.too.large" ? 413 : 500);
 
   const payload = {

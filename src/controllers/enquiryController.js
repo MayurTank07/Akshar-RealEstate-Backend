@@ -3,7 +3,11 @@ import { Enquiry } from "../models/Enquiry.js";
 import { Property } from "../models/Property.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { escapeRegExp } from "../utils/escapeRegExp.js";
+import { parsePagination } from "../utils/pagination.js";
 import { parseINRAmount } from "../utils/reporting.js";
+
+const ENQUIRY_SORT_FIELDS = ["createdAt", "updatedAt", "name", "status", "source"];
 
 function normalizeEnquiry(body) {
   return {
@@ -44,7 +48,7 @@ function enquiryFilter(query, user) {
   if (query.conversionType && query.conversionType !== "all") {
     filter.conversionType = query.conversionType === "no-conversion" ? { $in: ["no-conversion", "", null] } : query.conversionType;
   }
-  if (query.city && query.city !== "all") filter.preferredLocation = new RegExp(query.city, "i");
+  if (query.city && query.city !== "all") filter.preferredLocation = new RegExp(escapeRegExp(query.city), "i");
   if (query.propertyId && query.propertyId !== "all") filter.propertyId = query.propertyId;
   if (query.supervisorId && query.supervisorId !== "all" && user.role === "admin") filter.assignedTo = query.supervisorId;
   if (query.dateFrom || query.dateTo) {
@@ -141,11 +145,18 @@ export const createPublicEnquiry = asyncHandler(async (req, res) => {
 });
 
 export const listEnquiries = asyncHandler(async (req, res) => {
-  const enquiries = await Enquiry.find(enquiryFilter(req.query, req.user))
-    .populate("assignedTo", "name email role")
-    .populate("propertyId", "title city location type price status propertyCode")
-    .sort({ createdAt: -1 });
-  res.json({ success: true, data: enquiries });
+  const filter = enquiryFilter(req.query, req.user);
+  const { page, limit, skip, sort } = parsePagination(req.query, { allowedSortFields: ENQUIRY_SORT_FIELDS });
+  const [enquiries, total] = await Promise.all([
+    Enquiry.find(filter)
+      .populate("assignedTo", "name email role")
+      .populate("propertyId", "title city location type price status propertyCode")
+      .sort(sort)
+      .skip(skip)
+      .limit(limit),
+    Enquiry.countDocuments(filter),
+  ]);
+  res.json({ success: true, data: enquiries, pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 } });
 });
 
 export const updateEnquiry = asyncHandler(async (req, res) => {

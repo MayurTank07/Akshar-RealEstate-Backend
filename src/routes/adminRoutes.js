@@ -9,11 +9,14 @@ import { createPropertyOption, listPropertyOptions } from "../controllers/proper
 import { exportReport, listSoldRentedReports } from "../controllers/reportController.js";
 import { createStaff, deleteStaff, listStaff, updateStaff } from "../controllers/staffController.js";
 import { exportUsers, listUsers, updateUserStatus, userStats } from "../controllers/userController.js";
-import { avatarUpload, propertyImageUpload, removeStaffCover, uploadPropertyImages, uploadStaffCover } from "../controllers/uploadController.js";
+import { avatarUpload, getAdminUploadToken, propertyImageUpload, refreshProofUrl, removeStaffCover, uploadPropertyImages, uploadStaffCover } from "../controllers/uploadController.js";
+import { certificationImageUpload, createCertification, deleteCertification, listAdminCertifications, updateCertification, uploadCertificationImageHandler } from "../controllers/certificationController.js";
 import { PERMISSIONS } from "../config/permissions.js";
 import { authenticate, authorize, requirePermission } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
 import {
+  certificationCreateSchema,
+  certificationUpdateSchema,
   contentUpdateSchema,
   enquiryUpdateSchema,
   ownerDeleteReviewSchema,
@@ -24,6 +27,7 @@ import {
   propertySchema,
   staffCreateSchema,
   staffUpdateSchema,
+  userStatusSchema,
 } from "../validators/schemas.js";
 
 const router = Router();
@@ -42,6 +46,7 @@ router.post("/property-options", authorize("admin", "supervisor"), requirePermis
 router.get("/properties/next-code", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT), nextPropertyCode);
 router.get("/properties/code/:propertyCode/available", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT), checkPropertyCode);
 router.get("/properties/:id", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.ASSIGNED_VIEW), validate(idParamSchema), getProperty);
+router.get("/uploads/token", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT), getAdminUploadToken);
 router.post("/uploads/property-images", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT), propertyImageUpload.array("images", 12), uploadPropertyImages);
 router.post("/properties", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD), validate(propertySchema), createProperty);
 router.put("/properties/:id", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_EDIT, PERMISSIONS.PROPERTIES_STATUS), validate(idParamSchema), validate(propertySchema), updateProperty);
@@ -59,6 +64,7 @@ router.delete("/staff/:id/cover", authorize("admin"), validate(idParamSchema), r
 router.delete("/staff/:id", authorize("admin"), validate(idParamSchema), deleteStaff);
 
 router.get("/owners", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.OWNER_MANAGEMENT), listOwners);
+router.get("/owners/:id/proof-url", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.OWNER_MANAGEMENT), validate(idParamSchema), refreshProofUrl);
 router.put("/owners/:id", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.OWNER_MANAGEMENT), validate(idParamSchema), validate(ownerAdminUpdateSchema), updateOwnerContent);
 router.put("/owners/:id/status", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.OWNER_MANAGEMENT), validate(idParamSchema), validate(ownerStatusSchema), updateOwnerStatus);
 router.put("/owners/:id/delete", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.OWNER_MANAGEMENT), validate(idParamSchema), validate(ownerDeleteReviewSchema), reviewOwnerDeleteRequest);
@@ -66,10 +72,16 @@ router.put("/owners/:id/delete", authorize("admin", "supervisor"), requirePermis
 router.get("/users", authorize("admin"), listUsers);
 router.get("/users/stats", authorize("admin"), userStats);
 router.get("/users/export", authorize("admin"), exportUsers);
-router.patch("/users/:id/status", authorize("admin"), validate(idParamSchema), updateUserStatus);
+router.patch("/users/:id/status", authorize("admin"), validate(idParamSchema), validate(userStatusSchema), updateUserStatus);
 
 router.put("/content/:id", authorize("admin"), validate(idParamSchema), validate(contentUpdateSchema), updateContent);
 router.get("/reports/sold-rented", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.REPORTS_EXPORT, PERMISSIONS.ANALYTICS_ACCESS), listSoldRentedReports);
 router.get("/reports/export", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.REPORTS_EXPORT, PERMISSIONS.ANALYTICS_ACCESS), exportReport);
+
+router.get("/certifications", authorize("admin", "supervisor"), listAdminCertifications);
+router.post("/certifications/upload", authorize("admin"), certificationImageUpload.single("image"), uploadCertificationImageHandler);
+router.post("/certifications", authorize("admin"), validate(certificationCreateSchema), createCertification);
+router.put("/certifications/:id", authorize("admin"), validate(idParamSchema), validate(certificationUpdateSchema), updateCertification);
+router.delete("/certifications/:id", authorize("admin"), validate(idParamSchema), deleteCertification);
 
 export default router;

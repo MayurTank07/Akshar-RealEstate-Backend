@@ -6,10 +6,10 @@ import { Staff } from "../models/Staff.js";
 import { generatePropertyCode, syncPropertyCodeCounter } from "../services/propertyCodeService.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { escapeRegExp } from "../utils/escapeRegExp.js";
+import { parsePagination } from "../utils/pagination.js";
 
-function escapeRegExp(value) {
-  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+const OWNER_SORT_FIELDS = ["createdAt", "updatedAt", "name", "status"];
 
 function statusLabel(status) {
   return String(status || "").replace(/_/g, " ");
@@ -107,7 +107,7 @@ function mapRequestToProperty(request, reviewer) {
     priceAmount: Number(details.expectedPrice || 0),
     beds: Number.parseInt(details.bhk, 10) || Number.parseInt(details.rooms, 10) || 0,
     sqft: sizeValue,
-    measurement: { value: sizeValue, unit: details.areaUnit || "sqft", customUnit: "" },
+    measurement: { value: sizeValue, unit: details.areaUnit || "sqft" },
     status: "active",
     propertyStatus: details.availability || "Ready",
     availability: details.availability || "Available",
@@ -340,13 +340,19 @@ export const listOwners = asyncHandler(async (req, res) => {
     ];
   }
 
-  const owners = await OwnerApplication.find(filter)
-    .populate("ownerUserId", "name email phone")
-    .populate("reviewedBy", "name role phone email designation avatar")
-    .populate("deleteReviewedBy", "name role")
-    .populate("approvedPropertyId", "title propertyCode status visibility city location")
-    .sort({ createdAt: -1 });
-  res.json({ success: true, data: owners });
+  const { page, limit, skip, sort } = parsePagination(req.query, { allowedSortFields: OWNER_SORT_FIELDS });
+  const [owners, total] = await Promise.all([
+    OwnerApplication.find(filter)
+      .populate("ownerUserId", "name email phone")
+      .populate("reviewedBy", "name role phone email designation avatar")
+      .populate("deleteReviewedBy", "name role")
+      .populate("approvedPropertyId", "title propertyCode status visibility city location")
+      .sort(sort)
+      .skip(skip)
+      .limit(limit),
+    OwnerApplication.countDocuments(filter),
+  ]);
+  res.json({ success: true, data: owners, pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 } });
 });
 
 export const updateOwnerContent = asyncHandler(async (req, res) => {

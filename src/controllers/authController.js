@@ -9,13 +9,15 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { publicPropertyView, sanitizeWishlistProperty } from "../utils/publicProperty.js";
 
 function signToken(staff) {
-  return jwt.sign({ sub: staff._id.toString(), role: staff.role, version: staff.tokenVersion || 0 }, env.jwtSecret, {
+  return jwt.sign({ sub: staff._id.toString(), role: staff.role, kind: "staff", version: staff.tokenVersion || 0 }, env.jwtSecret, {
+    algorithm: "HS256",
     expiresIn: env.jwtExpiresIn,
   });
 }
 
 function signUserToken(user) {
   return jwt.sign({ sub: user._id.toString(), role: user.role, kind: "user", version: user.tokenVersion || 0 }, env.jwtSecret, {
+    algorithm: "HS256",
     expiresIn: env.jwtExpiresIn,
   });
 }
@@ -105,7 +107,6 @@ export const changePassword = asyncHandler(async (req, res) => {
   }
 
   staff.passwordHash = await Staff.hashPassword(newPassword);
-  staff.passwordPlain = newPassword;
   staff.tokenVersion = (staff.tokenVersion || 0) + 1;
   await staff.save();
 

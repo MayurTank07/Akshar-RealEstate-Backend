@@ -109,10 +109,9 @@ export const propertySchema = z.object({
       .object({
         value: z.coerce.number().min(0).optional().default(0),
         unit: z.string().trim().min(1).optional().default("sqft"),
-        customUnit: z.string().optional().default(""),
       })
       .optional()
-      .default({ value: 0, unit: "sqft", customUnit: "" }),
+      .default({ value: 0, unit: "sqft" }),
     area: z.string().optional().default(""),
     tag: z.string().trim().min(1).default("Standard"),
     badge: z.string().optional().default(""),
@@ -395,8 +394,29 @@ export const ownerAdminUpdateSchema = z.object({
   }),
 });
 
+export const userStatusSchema = z.object({
+  body: z.object({
+    status: z.enum(["active", "disabled"]),
+  }),
+});
+
 export const contentUpdateSchema = z.object({
   body: z.object({
     value: z.any(),
   }),
+});
+
+export const certificationCreateSchema = z.object({
+  body: z.object({
+    title: z.string().trim().optional().default(""),
+    description: z.string().trim().optional().default(""),
+    image: z.string().trim().min(1, "Certification image is required"),
+    publicId: z.string().trim().optional().default(""),
+    displayOrder: z.coerce.number().int().min(0).optional().default(0),
+    isActive: z.coerce.boolean().optional().default(true),
+  }),
+});
+
+export const certificationUpdateSchema = z.object({
+  body: certificationCreateSchema.shape.body.partial(),
 });

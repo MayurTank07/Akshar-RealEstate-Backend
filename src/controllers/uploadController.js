@@ -4,6 +4,9 @@ import { env } from "../config/env.js";
 import { Staff } from "../models/Staff.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { isAllowedImageFile, isAllowedMediaFile, isAllowedProofFile, sanitizeFilename, scanForViruses, validateImageFile, validateMediaFile, validateProofFile } from "../utils/fileValidation.js";
+import { OwnerApplication } from "../models/OwnerApplication.js";
+import { checkUploadQuota } from "../utils/uploadQuota.js";
 
 cloudinary.config({
   cloud_name: env.cloudinary.cloudName,
@@ -18,8 +21,8 @@ export const propertyImageUpload = multer({
     files: 12,
   },
   fileFilter: (_req, file, cb) => {
-    if (!file.mimetype?.startsWith("image/")) {
-      return cb(new ApiError(422, "Only image files are allowed"));
+    if (!isAllowedImageFile(file.mimetype, file.originalname)) {
+      return cb(new ApiError(422, "Only JPEG, PNG, GIF, WebP, BMP, TIFF, HEIC, and AVIF image files are allowed"));
     }
     return cb(null, true);
   },
@@ -32,8 +35,8 @@ export const avatarUpload = multer({
     files: 1,
   },
   fileFilter: (_req, file, cb) => {
-    if (!file.mimetype?.startsWith("image/")) {
-      return cb(new ApiError(422, "Only image files are allowed"));
+    if (!isAllowedImageFile(file.mimetype, file.originalname)) {
+      return cb(new ApiError(422, "Only JPEG, PNG, GIF, WebP, BMP, TIFF, HEIC, and AVIF image files are allowed"));
     }
     return cb(null, true);
   },
@@ -46,12 +49,8 @@ export const ownerMediaUpload = multer({
     files: 16,
   },
   fileFilter: (_req, file, cb) => {
-    const allowed =
-      file.mimetype?.startsWith("image/") ||
-      file.mimetype?.startsWith("video/") ||
-      ["application/pdf", "image/heic", "image/heif"].includes(file.mimetype);
-    if (!allowed) {
-      return cb(new ApiError(422, "Only image, video, and PDF files are allowed"));
+    if (!isAllowedMediaFile(file.mimetype, file.originalname)) {
+      return cb(new ApiError(422, "Only image (JPEG/PNG/WebP/HEIC), video (MP4/MOV/WebM), and PDF files are allowed"));
     }
     return cb(null, true);
   },
@@ -64,9 +63,8 @@ export const ownerProofUpload = multer({
     files: 5,
   },
   fileFilter: (_req, file, cb) => {
-    const allowed = file.mimetype?.startsWith("image/") || file.mimetype === "application/pdf";
-    if (!allowed) {
-      return cb(new ApiError(422, "Owner proofs must be PDF or image files"));
+    if (!isAllowedProofFile(file.mimetype, file.originalname)) {
+      return cb(new ApiError(422, "Owner proofs must be JPEG, PNG, or PDF files"));
     }
     return cb(null, true);
   },
@@ -154,17 +152,31 @@ export const uploadPropertyImages = asyncHandler(async (req, res) => {
     throw new ApiError(422, "Please upload at least one image");
   }
 
-  const results = await Promise.all(files.map((file) => uploadBuffer(file)));
-  const urls = results.map((result) => result.secure_url);
+  for (const file of files) {
+    validateImageFile(file);
+    await scanForViruses(file);
+  }
+
+  checkUploadQuota(req.ip || "", files.reduce((s, f) => s + f.size, 0), 500 * 1024 * 1024);
+
+  const settled = await Promise.allSettled(files.map((file) => uploadBuffer(file)));
+  const succeeded = settled.filter((r) => r.status === "fulfilled").map((r) => r.value);
+  const failed = settled.filter((r) => r.status === "rejected");
+  if (failed.length) {
+    await Promise.allSettled(succeeded.map((r) => cloudinary.uploader.destroy(r.public_id)));
+    throw new ApiError(502, `${failed.length} image(s) failed to upload. Please try again.`);
+  }
+
+  const urls = succeeded.map((r) => r.secure_url);
   res.status(201).json({
     success: true,
     data: {
       urls,
       files: files.map((file, index) => ({
-        originalName: file.originalname,
+        originalName: sanitizeFilename(file.originalname),
         size: file.size,
         url: urls[index],
-        publicId: results[index].public_id,
+        publicId: succeeded[index].public_id,
       })),
     },
   });
@@ -174,6 +186,9 @@ export const uploadAvatar = asyncHandler(async (req, res) => {
   if (!req.file) {
     throw new ApiError(422, "Please upload a profile image");
   }
+
+  validateImageFile(req.file);
+  await scanForViruses(req.file);
 
   const result = await uploadBuffer(req.file, "akshar-realestate/avatars", [
     { width: 512, height: 512, crop: "fill", gravity: "face" },
@@ -193,6 +208,8 @@ export const uploadAvatar = asyncHandler(async (req, res) => {
 });
 
 async function saveStaffCover(staff, file) {
+  validateImageFile(file);
+  await scanForViruses(file);
   const result = await uploadBuffer(file, "akshar-realestate/staff-covers", [
     { width: 1800, height: 600, crop: "fill", gravity: "auto" },
     { quality: "auto", fetch_format: "auto" },
@@ -236,17 +253,25 @@ export const uploadOwnerMedia = asyncHandler(async (req, res) => {
     throw new ApiError(422, "Please upload at least one file");
   }
 
-  const results = await Promise.all(files.map((file) => uploadOwnerBuffer(file)));
-  const payload = {
-    photos: [],
-    videos: [],
-    documents: [],
-    files: [],
-  };
+  for (const file of files) {
+    validateMediaFile(file);
+    await scanForViruses(file);
+  }
 
-  results.forEach((result, index) => {
+  checkUploadQuota(req.ip || "", files.reduce((s, f) => s + f.size, 0), 200 * 1024 * 1024);
+
+  const settled = await Promise.allSettled(files.map((file) => uploadOwnerBuffer(file)));
+  const succeeded = settled.filter((r) => r.status === "fulfilled").map((r) => r.value);
+  const failed = settled.filter((r) => r.status === "rejected");
+  if (failed.length) {
+    await Promise.allSettled(succeeded.map((r) => cloudinary.uploader.destroy(r.public_id, { resource_type: r.resourceType || "image" })));
+    throw new ApiError(502, `${failed.length} file(s) failed to upload. Please try again.`);
+  }
+
+  const payload = { photos: [], videos: [], documents: [], files: [] };
+  succeeded.forEach((result, index) => {
     const item = {
-      originalName: files[index].originalname,
+      originalName: sanitizeFilename(files[index].originalname),
       size: files[index].size,
       url: result.secure_url,
       publicId: result.public_id,
@@ -272,14 +297,28 @@ export const uploadOwnerProofs = asyncHandler(async (req, res) => {
     throw new ApiError(422, "Please upload at least one owner proof");
   }
 
-  const results = await Promise.all(files.map((file) => uploadOwnerProofBuffer(file)));
+  for (const file of files) {
+    validateProofFile(file);
+    await scanForViruses(file);
+  }
+
+  checkUploadQuota(req.ip || "", files.reduce((s, f) => s + f.size, 0), 100 * 1024 * 1024);
+
+  const settled = await Promise.allSettled(files.map((file) => uploadOwnerProofBuffer(file)));
+  const succeeded = settled.filter((r) => r.status === "fulfilled").map((r) => r.value);
+  const failed = settled.filter((r) => r.status === "rejected");
+  if (failed.length) {
+    await Promise.allSettled(succeeded.map((r) => cloudinary.uploader.destroy(r.public_id, { resource_type: r.resource_type || "image", type: "authenticated" })));
+    throw new ApiError(502, `${failed.length} proof file(s) failed to upload. Please try again.`);
+  }
+
   res.status(201).json({
     success: true,
     data: files.map((file, index) => {
-      const result = results[index];
+      const result = succeeded[index];
       return {
         documentType,
-        originalName: file.originalname,
+        originalName: sanitizeFilename(file.originalname),
         mimeType: file.mimetype,
         resourceType: result.resource_type,
         format: result.format || "",
@@ -290,6 +329,7 @@ export const uploadOwnerProofs = asyncHandler(async (req, res) => {
           type: "authenticated",
           resource_type: result.resource_type,
           format: result.format || undefined,
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
         }),
         publicId: result.public_id,
         status: "uploaded",
@@ -297,4 +337,50 @@ export const uploadOwnerProofs = asyncHandler(async (req, res) => {
       };
     }),
   });
+});
+
+function buildUploadToken(folder) {
+  if (!env.cloudinary.cloudName || !env.cloudinary.apiKey || !env.cloudinary.apiSecret) {
+    throw new ApiError(500, "Cloudinary is not configured");
+  }
+  const timestamp = Math.round(Date.now() / 1000);
+  const paramsToSign = { folder, timestamp };
+  const signature = cloudinary.utils.api_sign_request(paramsToSign, env.cloudinary.apiSecret);
+  return { cloudName: env.cloudinary.cloudName, apiKey: env.cloudinary.apiKey, timestamp, signature, folder, expiresAt: timestamp + 3600 };
+}
+
+export const getOwnerUploadToken = asyncHandler(async (_req, res) => {
+  const token = buildUploadToken("akshar-realestate/owner-submissions");
+  res.json({ success: true, data: token });
+});
+
+export const getAdminUploadToken = asyncHandler(async (_req, res) => {
+  const token = buildUploadToken("akshar-realestate/properties");
+  res.json({ success: true, data: token });
+});
+
+export const refreshProofUrl = asyncHandler(async (req, res) => {
+  if (!env.cloudinary.cloudName || !env.cloudinary.apiKey || !env.cloudinary.apiSecret) {
+    throw new ApiError(500, "Cloudinary is not configured");
+  }
+  const { id } = req.validated.params;
+  const publicId = String(req.query.publicId || "").trim();
+  if (!publicId) throw new ApiError(400, "publicId query param is required");
+
+  const owner = await OwnerApplication.findById(id).select("media.ownerProofs");
+  if (!owner) throw new ApiError(404, "Owner application not found");
+
+  const proof = owner.media?.ownerProofs?.find((p) => p.publicId === publicId);
+  if (!proof) throw new ApiError(404, "Proof not found in this owner application");
+
+  const url = cloudinary.url(proof.publicId, {
+    secure: true,
+    sign_url: true,
+    type: "authenticated",
+    resource_type: proof.resourceType || "image",
+    format: proof.format || undefined,
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+  });
+
+  res.json({ success: true, data: { url, expiresAt: new Date(Date.now() + 3600 * 1000).toISOString() } });
 });

@@ -23,7 +23,6 @@ const propertySchema = new mongoose.Schema(
         trim: true,
         default: "sqft",
       },
-      customUnit: { type: String, trim: true, default: "" },
     },
     area: { type: String, trim: true, default: "" },
     tag: { type: String, trim: true, default: "Standard" },
