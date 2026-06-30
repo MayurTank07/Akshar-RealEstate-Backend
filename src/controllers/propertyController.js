@@ -124,6 +124,13 @@ function tokenSearchFilter(token, includePrivateSearch) {
   return { $or: fields.map((field) => ({ [field]: pattern })) };
 }
 
+function booleanQuery(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (["true", "1", "yes", "new-projects", "new projects"].includes(normalized)) return true;
+  if (["false", "0", "no", "standard"].includes(normalized)) return false;
+  return null;
+}
+
 const listQuery = (query, { includePrivateSearch = true } = {}) => {
   const filter = {};
 
@@ -135,6 +142,11 @@ const listQuery = (query, { includePrivateSearch = true } = {}) => {
   }
   if (query.city && query.city !== "all") filter.city = new RegExp(escapeRegExp(query.city), "i");
   if (query.type && query.type !== "all") filter.type = new RegExp(`^${escapeRegExp(query.type)}$`, "i");
+  const category = String(query.category || "").trim();
+  const newProjectQuery = [query.isNewProject, query.newProject, query.newProjects].map(booleanQuery).find((value) => value !== null);
+  if (newProjectQuery === true || category.toLowerCase() === "new projects") filter.isNewProject = true;
+  if (newProjectQuery === false) filter.isNewProject = { $ne: true };
+  if (category && category !== "all" && category.toLowerCase() !== "new projects") filter.category = new RegExp(`^${escapeRegExp(category)}$`, "i");
   if (query.source) filter.source = query.source;
   if (query.propertyCode && query.propertyCode !== "all") filter.propertyCode = new RegExp(escapeRegExp(query.propertyCode), "i");
   if (query.propertyId && query.propertyId !== "all") filter.propertyCode = new RegExp(escapeRegExp(query.propertyId), "i");
@@ -188,6 +200,12 @@ function normalizeMoneyFields(body) {
     body.commissionAmount = body.commissionAmount || parseINRAmount(body.commission);
     body.commission = body.commissionAmount ? String(body.commissionAmount) : "";
   }
+  return body;
+}
+
+function normalizeNewProjectFlag(body) {
+  const category = String(body.category || "").trim().toLowerCase();
+  if (category === "new projects") body.isNewProject = true;
   return body;
 }
 
@@ -271,6 +289,7 @@ export const checkPropertyCode = asyncHandler(async (req, res) => {
 export const createProperty = asyncHandler(async (req, res) => {
   const body = { ...req.validated.body };
   normalizeMoneyFields(body);
+  normalizeNewProjectFlag(body);
   if (req.user.role === "supervisor") {
     body.assignedTo = req.user._id;
   }
@@ -317,6 +336,7 @@ export const updateProperty = asyncHandler(async (req, res) => {
   const previousStatus = existing.status;
 
   const body = normalizeMoneyFields({ ...req.validated.body, updatedBy: req.user._id });
+  normalizeNewProjectFlag(body);
   if (req.user.role === "supervisor") {
     delete body.assignedTo;
   }

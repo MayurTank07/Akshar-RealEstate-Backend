@@ -142,6 +142,7 @@ export const propertySchema = z.object({
     furnishing: z.string().optional().default(""),
     ageOfProperty: z.string().optional().default(""),
     propertyTags: stringArray,
+    isNewProject: z.coerce.boolean().optional().default(false),
     isPreLeased: z.coerce.boolean().optional().default(false),
     isBarter: z.coerce.boolean().optional().default(false),
     roi: z.string().optional().default(""),

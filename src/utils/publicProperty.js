@@ -50,6 +50,7 @@ const PUBLIC_PROPERTY_FIELDS = [
   "furnishing",
   "ageOfProperty",
   "propertyTags",
+  "isNewProject",
   "isPreLeased",
   "isBarter",
   "roi",

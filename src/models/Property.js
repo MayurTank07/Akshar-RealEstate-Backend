@@ -56,6 +56,7 @@ const propertySchema = new mongoose.Schema(
     furnishing: { type: String, trim: true, default: "" },
     ageOfProperty: { type: String, trim: true, default: "" },
     propertyTags: [{ type: String, trim: true }],
+    isNewProject: { type: Boolean, default: false },
     isPreLeased: { type: Boolean, default: false },
     isBarter: { type: Boolean, default: false },
     roi: { type: String, trim: true, default: "" },
@@ -107,6 +108,7 @@ const propertySchema = new mongoose.Schema(
 
 propertySchema.index({ title: "text", location: "text", city: "text", type: "text", ownerName: "text", developerName: "text", topProject: "text", topDeveloper: "text", dealType: "text", propertyCode: "text", status: "text", category: "text", propertyStatus: "text" });
 propertySchema.index({ status: 1, statusUpdatedAt: -1, assignedTo: 1, createdBy: 1 });
+propertySchema.index({ isNewProject: 1, status: 1, createdAt: -1 });
 propertySchema.index({ propertyCode: 1 }, { unique: true, partialFilterExpression: { propertyCode: { $type: "string", $gt: "" } } });
 
 export const Property = mongoose.model("Property", propertySchema);
