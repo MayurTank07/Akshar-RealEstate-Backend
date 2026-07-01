@@ -10,6 +10,9 @@ const cityCodes = {
   gandhinagar: "GNR",
 };
 
+const propertyCodePattern = /^AETP-[A-Z0-9]{2,4}-(\d{4,6})$/;
+const suspiciousCounterFloor = 1_000_000;
+
 export function cityCodeFor(city = "") {
   const normalized = String(city || "").trim().toLowerCase();
   if (cityCodes[normalized]) return cityCodes[normalized];
@@ -17,13 +20,17 @@ export function cityCodeFor(city = "") {
   return (letters.slice(0, 4) || "GEN").padEnd(2, "X");
 }
 
+export function isReadablePropertyCode(propertyCode = "") {
+  return propertyCodePattern.test(String(propertyCode || "").trim().toUpperCase());
+}
+
 function sequenceFromCode(propertyCode = "") {
-  const match = String(propertyCode).match(/-(\d+)$/);
+  const match = String(propertyCode || "").trim().toUpperCase().match(propertyCodePattern);
   return match ? Number(match[1]) : 0;
 }
 
 async function highestExistingSequence() {
-  const existing = await Property.find({ propertyCode: /^AETP-[A-Z0-9]+-\d+$/ })
+  const existing = await Property.find({ propertyCode: /^AETP-[A-Z0-9]{2,4}-\d{4,6}$/ })
     .select("propertyCode")
     .lean();
   return existing.reduce((max, item) => Math.max(max, sequenceFromCode(item.propertyCode)), 0);
@@ -31,7 +38,17 @@ async function highestExistingSequence() {
 
 async function nextGlobalSequence({ reserve = false } = {}) {
   const counter = await Counter.findOne({ key: "property:global" }).lean();
-  const current = Math.max(Number(counter?.seq || 0), await highestExistingSequence());
+  const existingHighest = await highestExistingSequence();
+  const counterSeq = Number(counter?.seq || 0);
+  const counterLooksPoisoned = counterSeq >= suspiciousCounterFloor && counterSeq > existingHighest + 1000;
+  const current = counterLooksPoisoned ? existingHighest : Math.max(counterSeq, existingHighest);
+  if (counterLooksPoisoned) {
+    await Counter.updateOne(
+      { key: "property:global" },
+      { $set: { seq: existingHighest } },
+      { upsert: true }
+    );
+  }
   if (!reserve) return current + 1;
   await Counter.updateOne(
     { key: "property:global" },

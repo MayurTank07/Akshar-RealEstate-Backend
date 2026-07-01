@@ -5,7 +5,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { escapeRegExp } from "../utils/escapeRegExp.js";
 import { parsePagination } from "../utils/pagination.js";
 import { parseINRAmount } from "../utils/reporting.js";
-import { generatePropertyCode, previewPropertyCode, syncPropertyCodeCounter } from "../services/propertyCodeService.js";
+import { generatePropertyCode, isReadablePropertyCode, previewPropertyCode, syncPropertyCodeCounter } from "../services/propertyCodeService.js";
 import { publicPropertyView } from "../utils/publicProperty.js";
 
 const PROPERTY_SORT_FIELDS = ["createdAt", "updatedAt", "title", "city", "type", "status", "priceAmount"];
@@ -302,6 +302,9 @@ export const createProperty = asyncHandler(async (req, res) => {
   }
   if (body.propertyCode) {
     body.propertyCode = String(body.propertyCode).trim().toUpperCase();
+    if (!isReadablePropertyCode(body.propertyCode)) {
+      throw new ApiError(422, "Property ID must use the AETP-CITY-0001 format.");
+    }
     const duplicate = await Property.exists({ propertyCode: body.propertyCode });
     if (duplicate) throw new ApiError(409, "Property ID already exists");
   } else {
@@ -356,6 +359,9 @@ export const updateProperty = asyncHandler(async (req, res) => {
   }
   if (body.propertyCode && body.propertyCode !== existing.propertyCode) {
     body.propertyCode = String(body.propertyCode).trim().toUpperCase();
+    if (!isReadablePropertyCode(body.propertyCode)) {
+      throw new ApiError(422, "Property ID must use the AETP-CITY-0001 format.");
+    }
     const duplicate = await Property.exists({ propertyCode: body.propertyCode, _id: { $ne: existing._id } });
     if (duplicate) throw new ApiError(409, "Property ID already exists");
   }
