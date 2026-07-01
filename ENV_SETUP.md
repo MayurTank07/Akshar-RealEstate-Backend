@@ -60,12 +60,12 @@ CLOUDINARY_API_SECRET=your-api-secret
 
 #### CORS Configuration
 ```env
-CORS_ORIGIN=http://127.0.0.1:5173,http://localhost:5173,https://akshar-real-estate.vercel.app
+CORS_ORIGIN=http://127.0.0.1:5173,http://localhost:5173,http://localhost:3000,https://www.aksharestate.in,https://aksharestate.in,https://akshar-real-estate.vercel.app
 ```
 
 **Add your frontend URLs (comma-separated):**
-- Local development: `http://127.0.0.1:5173` and `http://localhost:5173`
-- Production: `https://akshar-real-estate.vercel.app`
+- Local development: `http://127.0.0.1:5173`, `http://localhost:5173`, and `http://localhost:3000`
+- Production: `https://www.aksharestate.in`, `https://aksharestate.in`, and any Vercel preview/legacy domains you use
 
 ## Running the Application
 
@@ -100,7 +100,7 @@ In your Render dashboard, add these environment variables:
 | `CLOUDINARY_CLOUD_NAME` | Your Cloudinary cloud name |
 | `CLOUDINARY_API_KEY` | Your Cloudinary API key |
 | `CLOUDINARY_API_SECRET` | Your Cloudinary API secret |
-| `CORS_ORIGIN` | `http://127.0.0.1:5173,http://localhost:5173,https://akshar-real-estate.vercel.app` |
+| `CORS_ORIGIN` | `http://127.0.0.1:5173,http://localhost:5173,http://localhost:3000,https://www.aksharestate.in,https://aksharestate.in,https://akshar-real-estate.vercel.app` |
 
 ### Render Deployment Steps
 

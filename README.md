@@ -78,7 +78,7 @@ If the server started on a fallback port, use that printed port and update `Fron
 | `CLOUDINARY_API_KEY` | ✅ for uploads | Cloudinary API key |
 | `CLOUDINARY_API_SECRET` | ✅ for uploads | Cloudinary API secret |
 | `GOOGLE_CLIENT_ID` | Optional | OAuth Web Client ID for Google login |
-| `CORS_ORIGIN` | Optional | Comma-separated allowed frontend origins |
+| `CORS_ORIGIN` | Optional | Comma-separated allowed frontend origins, e.g. `https://www.aksharestate.in,https://aksharestate.in,http://localhost:5173,http://localhost:3000` |
 | `PORT` | Optional | API port (default: `5000`) |
 | `PORT_FALLBACK` | Optional | Auto-increment port if busy (`true`/`false`) |
 

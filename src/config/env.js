@@ -19,6 +19,8 @@ if (nodeEnv === "production") {
 }
 
 const developmentCorsOrigins = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
   "http://127.0.0.1:5173",
   "http://localhost:5173",
   "http://127.0.0.1:5174",
@@ -39,9 +41,18 @@ const developmentCorsOrigins = [
   "http://localhost:4173",
 ];
 const productionCorsOrigins = [
+  "https://www.aksharestate.in",
+  "https://aksharestate.in",
   "https://akshar-real-estate.vercel.app",
 ];
 const defaultCorsOrigins = nodeEnv === "production" ? productionCorsOrigins : [...developmentCorsOrigins, ...productionCorsOrigins];
+
+function parseCorsOrigins(value = "") {
+  return value
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+}
 
 for (const [key, value] of required) {
   if (!value) {
@@ -62,5 +73,5 @@ export const env = {
     apiKey: process.env.CLOUDINARY_API_KEY || "",
     apiSecret: process.env.CLOUDINARY_API_SECRET || "",
   },
-  corsOrigins: [...new Set([...(process.env.CORS_ORIGIN || "").split(","), ...defaultCorsOrigins].map((origin) => origin.trim()).filter(Boolean))],
+  corsOrigins: [...new Set([...parseCorsOrigins(process.env.CORS_ORIGIN), ...defaultCorsOrigins])],
 };
