@@ -246,7 +246,7 @@ export const publicProperties = asyncHandler(async (req, res) => {
 });
 
 export const publicProperty = asyncHandler(async (req, res) => {
-  const property = await Property.findOne({ _id: req.validated.params.id, visibility: { $ne: "private" } })
+  const property = await Property.findOne({ _id: req.validated.params.id, status: "active", deletedAt: null, visibility: { $ne: "private" } })
     .populate("assignedTo", "name phone designation avatar role")
     .populate("createdBy", "name phone designation avatar role");
   if (!property) throw new ApiError(404, "Property not found");
