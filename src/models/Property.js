@@ -103,6 +103,8 @@ const propertySchema = new mongoose.Schema(
     ownerUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     ownerRequestId: { type: mongoose.Schema.Types.ObjectId, ref: "OwnerApplication", default: null },
     source: { type: String, enum: ["home", "pricing", "admin_added", "supervisor_added", "seller_owner"], default: "pricing" },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Staff", default: null },
   },
   { timestamps: true }
 );

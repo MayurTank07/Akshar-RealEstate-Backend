@@ -134,6 +134,7 @@ function booleanQuery(value) {
 
 const listQuery = (query, { includePrivateSearch = true } = {}) => {
   const filter = {};
+  if (String(query.includeDeleted || "").toLowerCase() !== "true") filter.deletedAt = null;
 
   if (query.status && query.status !== "all") filter.status = query.status;
   if (query.availability && query.availability !== "all") {
@@ -405,7 +406,28 @@ export const deleteProperty = asyncHandler(async (req, res) => {
   const property = await Property.findById(req.validated.params.id);
   if (!property) throw new ApiError(404, "Property not found");
   if (!canAccessProperty(req.user, property)) throw new ApiError(403, "You can only delete assigned properties");
-  if (property.status === "sold") throw new ApiError(400, "Sold properties cannot be deleted because they are retained for reports and analytics.");
+  const shouldArchiveForReports = ["sold", "rented"].includes(property.status);
+  if (shouldArchiveForReports) {
+    property.visibility = "private";
+    property.deletedAt = new Date();
+    property.deletedBy = req.user._id;
+    property.updatedBy = req.user._id;
+    await property.save();
+    await Activity.create({
+      type: "Property",
+      title: "Property archived",
+      description: property.title,
+      category: "property",
+      priority: "high",
+      referenceType: "property",
+      referenceId: property._id,
+      metadata: { propertyId: property._id, propertyName: property.title, status: property.status, archived: true },
+      actorName: req.user.name,
+      actorId: req.user._id,
+      targetStaffIds: activityTargets(property.assignedTo, property.createdBy),
+    });
+    return res.json({ success: true, data: { id: property._id, archived: true }, message: "Closed property archived and hidden from listings." });
+  }
   await property.deleteOne();
   await Activity.create({
     type: "Property",
