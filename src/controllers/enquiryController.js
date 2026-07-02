@@ -10,8 +10,14 @@ import { parseINRAmount } from "../utils/reporting.js";
 const ENQUIRY_SORT_FIELDS = ["createdAt", "updatedAt", "name", "status", "source"];
 
 function normalizeEnquiry(body) {
+  const countryCode = String(body.countryCode || "+91").trim();
+  const rawPhone = String(body.phone || "").trim();
+  const digitPhone = rawPhone.replace(/\D/g, "");
+  const normalizedPhone = rawPhone.startsWith("+") ? rawPhone : digitPhone ? `${countryCode}${digitPhone}` : rawPhone;
   return {
     ...body,
+    countryCode,
+    phone: normalizedPhone,
     preferredLocation: body.preferredLocation || body.location || "",
     propertyType: body.propertyType || body.type || "",
     budget: String(body.budget || ""),

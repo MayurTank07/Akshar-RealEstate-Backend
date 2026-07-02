@@ -4,6 +4,7 @@ const enquirySchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, lowercase: true, trim: true },
+    countryCode: { type: String, trim: true, default: "+91" },
     phone: { type: String, required: true, trim: true },
     age: { type: Number },
     preferredLocation: { type: String, trim: true, default: "" },

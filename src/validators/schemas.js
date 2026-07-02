@@ -6,6 +6,27 @@ const objectId = z.string().regex(/^[a-f\d]{24}$/i, "Invalid id");
 const mediaString = z.string().min(1);
 const stringArray = z.array(z.string().trim().min(1)).optional().default([]);
 const assignableId = z.union([objectId, z.literal(""), z.null()]).optional().transform((value) => value || null);
+const propertyTextLimit = 1000;
+const propertyDescription = z.string().trim().max(propertyTextLimit, "Property description must be 1000 characters or less");
+const nearbyLandmarksText = z.string().trim().max(propertyTextLimit, "Nearby landmarks must be 1000 characters or less");
+const ownerProofDocumentSchema = z
+  .object({
+    documentType: z.enum(["Ownership Proof", "Electricity Bill", "Tax Bill", "Index Copy", "Other"]),
+    customDocumentName: z.string().trim().max(80, "Custom document name must be 80 characters or less").optional().default(""),
+    originalName: z.string().trim().min(1),
+    mimeType: z.string().trim().min(1),
+    resourceType: z.string().trim().optional().default("image"),
+    format: z.string().trim().optional().default(""),
+    size: z.coerce.number().min(0).optional().default(0),
+    url: z.string().trim().min(1),
+    publicId: z.string().trim().optional().default(""),
+    status: z.enum(["uploaded", "verified", "rejected"]).optional().default("uploaded"),
+    uploadedAt: z.union([z.coerce.date(), z.string()]).optional(),
+  })
+  .refine((value) => value.documentType !== "Other" || Boolean(value.customDocumentName), {
+    message: "Custom document name is required when owner proof type is Others",
+    path: ["customDocumentName"],
+  });
 
 export const idParamSchema = z.object({
   params: z.object({ id: objectId }),
@@ -130,7 +151,8 @@ export const propertySchema = z.object({
     ownerName: z.string().optional().default("Akshar Estate"),
     image: mediaString,
     gallery: z.array(mediaString).optional().default([]),
-    description: z.string().optional().default(""),
+    description: propertyDescription.optional().default(""),
+    nearbyLandmarks: nearbyLandmarksText.optional().default(""),
     videoUrl: z.string().optional().default(""),
     amenities: stringArray,
     features: stringArray,
@@ -202,6 +224,7 @@ export const enquiryCreateSchema = z.object({
   body: z.object({
     name: z.string().min(2),
     email: z.string().email(),
+    countryCode: z.string().trim().regex(/^\+\d{1,4}$/, "Country code must start with + and contain digits").optional().default("+91"),
     phone: z.string().min(8),
     age: z.coerce.number().optional(),
     preferredLocation: z.string().optional().default(""),
@@ -317,8 +340,8 @@ const ownerPropertyDetailsSchema = z.object({
   negotiable: z.coerce.boolean().optional().default(false),
   maintenanceCharges: z.coerce.number().min(0).optional().default(0),
   amenities: z.array(z.string().trim().min(1)).optional().default([]),
-  description: z.string().trim().min(20),
-  nearbyLandmarks: z.string().trim().optional().default(""),
+  description: propertyDescription.min(20, "Property description must be at least 20 characters"),
+  nearbyLandmarks: nearbyLandmarksText.optional().default(""),
   availability: z.string().trim().optional().default(""),
   map: z
     .object({
@@ -352,20 +375,7 @@ export const ownerRequestSchema = z.object({
         videos: z.array(z.string().trim().min(1)).optional().default([]),
         documents: z.array(z.string().trim().min(1)).optional().default([]),
         ownerProofs: z
-          .array(
-            z.object({
-              documentType: z.enum(["Ownership Proof", "Electricity Bill", "Tax Bill", "Index Copy", "Other"]),
-              originalName: z.string().trim().min(1),
-              mimeType: z.string().trim().min(1),
-              resourceType: z.string().trim().optional().default("image"),
-              format: z.string().trim().optional().default(""),
-              size: z.coerce.number().min(0).optional().default(0),
-              url: z.string().trim().min(1),
-              publicId: z.string().trim().optional().default(""),
-              status: z.enum(["uploaded", "verified", "rejected"]).optional().default("uploaded"),
-              uploadedAt: z.union([z.coerce.date(), z.string()]).optional(),
-            })
-          )
+          .array(ownerProofDocumentSchema)
           .min(1, "At least one owner proof document is required"),
       })
       .default({ photos: [], videos: [], documents: [], ownerProofs: [] }),

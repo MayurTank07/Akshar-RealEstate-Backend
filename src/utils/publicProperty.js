@@ -39,6 +39,7 @@ const PUBLIC_PROPERTY_FIELDS = [
   "image",
   "gallery",
   "description",
+  "nearbyLandmarks",
   "videoUrl",
   "amenities",
   "features",
@@ -69,6 +70,12 @@ function pick(source, keys) {
   return Object.fromEntries(keys.filter((key) => source[key] !== undefined).map((key) => [key, source[key]]));
 }
 
+function sanitizePublicDescription(value = "") {
+  return String(value)
+    .replace(/private site visits?/gi, "private consultation")
+    .replace(/site visits?/gi, "property consultation");
+}
+
 function publicBroker(property) {
   const staff = plainObject(property.assignedTo || property.createdBy);
   return {
@@ -82,6 +89,7 @@ function publicBroker(property) {
 export function publicPropertyView(value) {
   const property = plainObject(value);
   const safe = pick(property, PUBLIC_PROPERTY_FIELDS);
+  if (safe.description) safe.description = sanitizePublicDescription(safe.description);
   const map = plainObject(property.map);
   safe.map = {
     area: map.area || property.location || "",
@@ -95,6 +103,7 @@ export function publicPropertyView(value) {
 export function sanitizeWishlistProperty(value) {
   const property = plainObject(value);
   const safe = pick(property, PUBLIC_PROPERTY_FIELDS);
+  if (safe.description) safe.description = sanitizePublicDescription(safe.description);
   const broker = plainObject(property.broker);
   const map = plainObject(property.map);
   safe.map = {

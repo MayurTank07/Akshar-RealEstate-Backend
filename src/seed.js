@@ -72,7 +72,7 @@ const enquiries = [
     email: "alice@email.com",
     phone: "+91 98765 43210",
     propertyTitle: "Luxury Modern Villa",
-    message: "Interested in scheduling a visit this weekend",
+    message: "Interested in more details this weekend",
     status: "new",
     source: "website",
   },

@@ -289,9 +289,16 @@ export const uploadOwnerMedia = asyncHandler(async (req, res) => {
 export const uploadOwnerProofs = asyncHandler(async (req, res) => {
   const files = req.files || [];
   const documentType = String(req.body?.documentType || "");
+  const customDocumentName = String(req.body?.customDocumentName || "").trim();
   const allowedTypes = ["Ownership Proof", "Electricity Bill", "Tax Bill", "Index Copy", "Other"];
   if (!allowedTypes.includes(documentType)) {
     throw new ApiError(422, "Please select a valid owner proof document type");
+  }
+  if (documentType === "Other" && !customDocumentName) {
+    throw new ApiError(422, "Custom document name is required when owner proof type is Others");
+  }
+  if (customDocumentName.length > 80) {
+    throw new ApiError(422, "Custom document name must be 80 characters or less");
   }
   if (!files.length) {
     throw new ApiError(422, "Please upload at least one owner proof");
@@ -318,6 +325,7 @@ export const uploadOwnerProofs = asyncHandler(async (req, res) => {
       const result = succeeded[index];
       return {
         documentType,
+        customDocumentName: documentType === "Other" ? customDocumentName : "",
         originalName: sanitizeFilename(file.originalname),
         mimeType: file.mimetype,
         resourceType: result.resource_type,

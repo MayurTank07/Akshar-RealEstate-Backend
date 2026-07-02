@@ -117,6 +117,7 @@ function mapRequestToProperty(request, reviewer) {
     gallery: request.media?.photos || [firstPhoto],
     videoUrl: request.media?.videos?.[0] || "",
     description: details.description,
+    nearbyLandmarks: details.nearbyLandmarks || "",
     amenities: details.amenities || [],
     parking: details.parking || "",
     floorNumber: details.floorNumber || "",
@@ -390,7 +391,7 @@ export const updateOwnerContent = asyncHandler(async (req, res) => {
       const mapped = mapRequestToProperty(owner, approvingStaff);
       const editableKeys = [
         "title", "location", "city", "area", "type", "dealType", "price", "priceAmount", "beds", "sqft", "measurement",
-        "propertyStatus", "availability", "image", "gallery", "videoUrl", "description", "amenities", "parking", "floorNumber",
+        "propertyStatus", "availability", "image", "gallery", "videoUrl", "description", "nearbyLandmarks", "amenities", "parking", "floorNumber",
         "totalFloors", "furnishing", "ageOfProperty", "yearBuilt", "facing", "map",
       ];
       editableKeys.forEach((key) => {

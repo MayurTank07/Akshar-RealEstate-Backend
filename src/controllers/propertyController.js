@@ -66,6 +66,7 @@ const SEARCH_FIELDS = [
   "parking",
   "area",
   "description",
+  "nearbyLandmarks",
   "amenities",
   "features",
   "facilities",

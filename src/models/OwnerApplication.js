@@ -32,8 +32,8 @@ const ownerApplicationSchema = new mongoose.Schema(
       negotiable: { type: Boolean, default: false },
       maintenanceCharges: { type: Number, default: 0 },
       amenities: [{ type: String, trim: true }],
-      description: { type: String, required: true, trim: true },
-      nearbyLandmarks: { type: String, trim: true, default: "" },
+      description: { type: String, required: true, trim: true, maxlength: 1000 },
+      nearbyLandmarks: { type: String, trim: true, maxlength: 1000, default: "" },
       availability: { type: String, trim: true, default: "" },
       map: {
         address: { type: String, trim: true, default: "" },
@@ -58,6 +58,7 @@ const ownerApplicationSchema = new mongoose.Schema(
             enum: ["Ownership Proof", "Electricity Bill", "Tax Bill", "Index Copy", "Other"],
             required: true,
           },
+          customDocumentName: { type: String, trim: true, default: "" },
           originalName: { type: String, required: true, trim: true },
           mimeType: { type: String, required: true, trim: true },
           resourceType: { type: String, trim: true, default: "image" },
