@@ -11,6 +11,7 @@ export function objectId(value) {
 
 export function propertyScope(user, query = {}) {
   const filter = user.role === "admin" ? {} : { $or: [{ assignedTo: user._id }, { createdBy: user._id }] };
+  if (String(query.includeDeleted || "").toLowerCase() !== "true") filter.deletedAt = null;
   if (query.supervisorId && query.supervisorId !== "all" && user.role === "admin") {
     const supervisorId = objectId(query.supervisorId);
     if (supervisorId) filter.$or = [{ assignedTo: supervisorId }, { createdBy: supervisorId }];

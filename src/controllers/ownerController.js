@@ -274,6 +274,43 @@ export const deleteMyOwnerRequest = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { id: req.validated.params.id, deleted: true } });
 });
 
+export const deleteOwnerRequest = asyncHandler(async (req, res) => {
+  const request = await OwnerApplication.findById(req.validated.params.id).populate("approvedPropertyId", "status title visibility");
+  if (!request) throw new ApiError(404, "Owner property request not found");
+  if (request.approvalInProgress) throw new ApiError(409, "This property is currently under approval review. Please try again shortly.");
+
+  const linkedProperty = request.approvedPropertyId ? await Property.findById(request.approvedPropertyId._id) : null;
+  let propertyAction = "none";
+  if (linkedProperty) {
+    if (["sold", "rented"].includes(linkedProperty.status)) {
+      linkedProperty.visibility = "private";
+      linkedProperty.deletedAt = new Date();
+      linkedProperty.deletedBy = req.user._id;
+      linkedProperty.updatedBy = req.user._id;
+      await linkedProperty.save();
+      propertyAction = "archived";
+    } else {
+      await linkedProperty.deleteOne();
+      propertyAction = "deleted";
+    }
+  }
+
+  await createActivity({
+    title: "Owner request deleted",
+    description: `${request.name} deleted ${request.propertyDetails?.title || "owner property request"}`,
+    category: "owner-delete",
+    priority: "high",
+    status: "deleted",
+    request,
+    actorName: req.user.name,
+    actorId: req.user._id,
+    targets: await ownerManagementTargets(),
+  });
+
+  await request.deleteOne();
+  res.json({ success: true, data: { id: req.validated.params.id, deleted: true, propertyAction } });
+});
+
 export const requestOwnerPropertyDelete = asyncHandler(async (req, res) => {
   const { reason } = req.validated.body;
   const request = await OwnerApplication.findOne({ _id: req.validated.params.id, ownerUserId: req.ownerUser._id }).populate("approvedPropertyId", "status visibility title");

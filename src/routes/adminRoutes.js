@@ -3,12 +3,12 @@ import { analytics, dashboard } from "../controllers/analyticsController.js";
 import { updateContent } from "../controllers/contentController.js";
 import { deleteEnquiry, listEnquiries, updateEnquiry } from "../controllers/enquiryController.js";
 import { listNotifications, markAllNotificationsRead, markNotificationRead } from "../controllers/notificationController.js";
-import { listOwners, reviewOwnerDeleteRequest, updateOwnerContent, updateOwnerStatus } from "../controllers/ownerController.js";
+import { deleteOwnerRequest, listOwners, reviewOwnerDeleteRequest, updateOwnerContent, updateOwnerStatus } from "../controllers/ownerController.js";
 import { checkPropertyCode, createProperty, deleteProperty, getProperty, listProperties, nextPropertyCode, updateProperty } from "../controllers/propertyController.js";
 import { createPropertyOption, listPropertyOptions } from "../controllers/propertyOptionController.js";
 import { exportReport, listSoldRentedReports } from "../controllers/reportController.js";
 import { createStaff, deleteStaff, listStaff, updateStaff } from "../controllers/staffController.js";
-import { exportUsers, listUsers, updateUserStatus, userStats } from "../controllers/userController.js";
+import { deleteUser, exportUsers, listUsers, updateUserStatus, userStats } from "../controllers/userController.js";
 import { avatarUpload, getAdminUploadToken, propertyImageUpload, refreshProofUrl, removeStaffCover, uploadPropertyImages, uploadStaffCover } from "../controllers/uploadController.js";
 import { certificationImageUpload, createCertification, deleteCertification, listAdminCertifications, updateCertification, uploadCertificationImageHandler } from "../controllers/certificationController.js";
 import { PERMISSIONS } from "../config/permissions.js";
@@ -68,11 +68,13 @@ router.get("/owners/:id/proof-url", authorize("admin", "supervisor"), requirePer
 router.put("/owners/:id", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.OWNER_MANAGEMENT), validate(idParamSchema), validate(ownerAdminUpdateSchema), updateOwnerContent);
 router.put("/owners/:id/status", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.OWNER_MANAGEMENT), validate(idParamSchema), validate(ownerStatusSchema), updateOwnerStatus);
 router.put("/owners/:id/delete", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.OWNER_MANAGEMENT), validate(idParamSchema), validate(ownerDeleteReviewSchema), reviewOwnerDeleteRequest);
+router.delete("/owners/:id", authorize("admin"), validate(idParamSchema), deleteOwnerRequest);
 
 router.get("/users", authorize("admin"), listUsers);
 router.get("/users/stats", authorize("admin"), userStats);
 router.get("/users/export", authorize("admin"), exportUsers);
 router.patch("/users/:id/status", authorize("admin"), validate(idParamSchema), validate(userStatusSchema), updateUserStatus);
+router.delete("/users/:id", authorize("admin"), validate(idParamSchema), deleteUser);
 
 router.put("/content/:id", authorize("admin"), validate(idParamSchema), validate(contentUpdateSchema), updateContent);
 router.get("/reports/sold-rented", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.REPORTS_EXPORT, PERMISSIONS.ANALYTICS_ACCESS), listSoldRentedReports);

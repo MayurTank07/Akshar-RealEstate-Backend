@@ -89,6 +89,13 @@ export const updateUserStatus = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { _id: user._id, status: user.status } });
 });
 
+export const deleteUser = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.validated.params.id);
+  if (!user) throw new ApiError(404, "User not found");
+  await user.deleteOne();
+  res.json({ success: true, data: { id: req.validated.params.id, deleted: true } });
+});
+
 export const exportUsers = asyncHandler(async (req, res) => {
   const format = req.query.format === "pdf" ? "pdf" : "excel";
   const authProvider = req.query.authProvider || "";
