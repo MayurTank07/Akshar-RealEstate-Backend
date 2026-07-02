@@ -62,6 +62,8 @@ export const contactContentDefault = {
   phone: "+91 1800-123-4567",
   email: "info@aksharrealestate.com",
   address: "SG Highway, Ahmedabad, Gujarat 380054",
+  footerDescription: "Your trusted Gujarat partner for verified homes, commercial spaces, and real estate guidance.",
+  footerCopyright: "2026 Akshar Estate The Property HUB. All rights reserved.",
   whatsapp: "+91 98765 43210",
   whatsappSettings: {
     enabled: true,
@@ -78,6 +80,7 @@ export const contactContentDefault = {
     facebook: "",
     linkedin: "",
     youtube: "",
+    x: "",
   },
   location: {
     address: "SG Highway, Ahmedabad, Gujarat 380054",
@@ -91,12 +94,57 @@ export const contactContentDefault = {
   },
 };
 
+export const homeSectionsContentDefault = {
+  videos: {
+    eyebrow: "",
+    title: "Watch Our Videos",
+    subtitle: "Explore our collection of short videos showcasing properties and insights",
+    items: [
+      { title: "Bungalow for Sale", location: "Karali, Vadodara", image: "/v1.jpg", overlay: "LUXURY HOME FOR SALE - VIRTUAL TOUR", button: "", url: "", enabled: true },
+      { title: "Bungalow for Sale", location: "Koba, Gandhinagar", image: "/v2.jpg", overlay: "", button: "", url: "", enabled: true },
+      { title: "Land for Sale", location: "Adajan, Surat", image: "/v3.jpg", overlay: "Property Video", button: "", url: "", enabled: true },
+      { title: "Villa for Sale", location: "Alkapuri, Vadodara", image: "/v4.jpg", overlay: "FOR SALE - DREAM HOME", button: "CONTACT AGENT", url: "", enabled: true },
+    ],
+  },
+  agents: {
+    eyebrow: "Our Experts",
+    title: "Meet our Expert Agents in Ahmedabad",
+    subtitle: "Connect with our certified real estate professionals across India",
+    items: [
+      { name: "Vikram Patel", city: "Vadodara", image: "/a1.jpg", description: "Experienced real estate professional with extensive knowledge of local market trends and property investment opportunities across India.", linkText: "View Agent Profile", linkUrl: "", enabled: true },
+      { name: "Rakesh Dahiyal", city: "Vadodara", image: "/a2.jpg", description: "Experienced real estate professional with extensive knowledge of local market trends and property investment opportunities across India.", linkText: "View Agent Profile", linkUrl: "", enabled: true },
+    ],
+  },
+  testimonials: {
+    eyebrow: "Testimonials",
+    title: "What Our Clients Say",
+    subtitle: "Don't just take our word for it. Here's what our valued clients have to say about their experience with us.",
+    items: [
+      { name: "Ananya Desai", role: "First-time Buyer", image: "/t1.jpg", text: "Buying my first home was daunting, but the LuxeEstate team guided me through every step. They were patient, answered all my questions, and made the entire process stress-free.", rating: 5, enabled: true },
+      { name: "Vikram Patel", role: "Commercial Buyer", image: "/t2.jpg", text: "Excellent service for commercial properties. They understood our business needs and found us the perfect location. Their professionalism and attention to detail are unmatched.", rating: 5, enabled: true },
+      { name: "Priya Sharma", role: "Homeowner", image: "/t3.jpg", text: "LuxeEstate made finding my dream home incredibly easy. Their team was professional, responsive, and truly understood what I was looking for.", rating: 5, enabled: true },
+      { name: "Rajesh Kumar", role: "Property Investor", image: "/t4.jpg", text: "As a real estate investor, I've worked with many agencies. LuxeEstate stands out with their market knowledge and transparent approach.", rating: 5, enabled: true },
+      { name: "Amit Shah", role: "Home Buyer", image: "/t5.jpg", text: "Smooth and transparent process. The team ensured everything was handled professionally from start to finish.", rating: 5, enabled: true },
+      { name: "Sneha Iyer", role: "Investor", image: "/t6.jpg", text: "Highly recommend LuxeEstate for property investments. Their insights helped me make the right decisions.", rating: 5, enabled: true },
+    ],
+  },
+  stats: {
+    items: [
+      { value: "10K+", label: "Happy Clients", enabled: true },
+      { value: "15K+", label: "Properties Sold", enabled: true },
+      { value: "4.9", label: "Average Rating", enabled: true },
+      { value: "25+", label: "Years Experience", enabled: true },
+    ],
+  },
+};
+
 export const siteContentDefaults = [
   { key: "siteName", section: "Branding", label: "Site Name", type: "text", value: "Akshar Estate The Property HUB" },
   { key: "heroTitle", section: "Home Hero", label: "Hero Title", type: "textarea", value: "We Turn Spaces into Places You Call Home" },
   { key: "heroSubtitle", section: "Home Hero", label: "Hero Subtitle", type: "textarea", value: "Discover verified homes, apartments, and investment-ready properties across Gujarat." },
   { key: "heroImage", section: "Home Hero", label: "Hero Background Image", type: "text", value: "/house.jpg" },
   { key: "heroCtaText", section: "Home Hero", label: "Hero CTA Text", type: "text", value: "Search" },
+  { key: "homeSectionsContent", section: "Home Sections", label: "Home Sections CMS Content", type: "json", value: homeSectionsContentDefault },
   { key: "navbarAreas", section: "Navigation", label: "Navbar Ahmedabad Areas", type: "json", value: ahmedabadAreas },
   { key: "navbarTopLists", section: "Navigation", label: "Top Projects & Developers", type: "json", value: topListDefaults },
   { key: "aboutContent", section: "About Us", label: "About Us CMS Content", type: "json", value: aboutContentDefault },

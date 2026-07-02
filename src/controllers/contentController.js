@@ -3,16 +3,42 @@ import { siteContentDefaults } from "../config/siteDefaults.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
+function isPlainObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value);
+}
+
+function mergeMissingDefaults(defaultValue, currentValue) {
+  if (!isPlainObject(defaultValue) || !isPlainObject(currentValue)) {
+    return currentValue === undefined || currentValue === null ? defaultValue : currentValue;
+  }
+  return Object.fromEntries(
+    Object.entries(defaultValue).map(([key, value]) => [
+      key,
+      mergeMissingDefaults(value, currentValue[key]),
+    ]).concat(
+      Object.entries(currentValue).filter(([key]) => !(key in defaultValue))
+    )
+  );
+}
+
 async function ensureDefaultContent() {
-  await Promise.all(
+  const defaults = await Promise.all(
     siteContentDefaults.map((item) =>
-      SiteContent.updateOne(
+      SiteContent.findOneAndUpdate(
         { key: item.key },
         { $setOnInsert: item },
-        { upsert: true }
+        { upsert: true, new: true, setDefaultsOnInsert: true }
       )
     )
   );
+  await Promise.all(defaults.map((content) => {
+    const defaultItem = siteContentDefaults.find((item) => item.key === content.key);
+    if (!defaultItem || !isPlainObject(defaultItem.value)) return null;
+    const mergedValue = mergeMissingDefaults(defaultItem.value, content.value);
+    if (JSON.stringify(mergedValue) === JSON.stringify(content.value)) return null;
+    content.value = mergedValue;
+    return content.save();
+  }));
 }
 
 export const publicContent = asyncHandler(async (_req, res) => {
