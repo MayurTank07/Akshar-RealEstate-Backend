@@ -12,6 +12,7 @@ const staffSchema = new mongoose.Schema(
     status: { type: String, enum: ["active", "disabled"], default: "active" },
     phone: { type: String, trim: true, default: "" },
     designation: { type: String, trim: true, default: "" },
+    companyName: { type: String, trim: true, default: "" },
     avatar: { type: String, trim: true, default: "" },
     coverImage: { type: String, trim: true, default: "" },
     permissions: {

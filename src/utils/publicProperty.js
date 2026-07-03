@@ -2,6 +2,7 @@ const DEFAULT_PUBLIC_BROKER = {
   name: "Akshar Estate Expert",
   phone: "+91 1800-123-4567",
   designation: "Real Estate Expert",
+  companyName: "Akshar Estate The Property HUB",
   avatar: "",
 };
 
@@ -82,6 +83,7 @@ function publicBroker(property) {
     name: staff.name || DEFAULT_PUBLIC_BROKER.name,
     phone: staff.phone || DEFAULT_PUBLIC_BROKER.phone,
     designation: staff.designation || DEFAULT_PUBLIC_BROKER.designation,
+    companyName: staff.companyName || DEFAULT_PUBLIC_BROKER.companyName,
     avatar: staff.avatar || DEFAULT_PUBLIC_BROKER.avatar,
   };
 }
@@ -115,6 +117,7 @@ export function sanitizeWishlistProperty(value) {
     name: broker.name || DEFAULT_PUBLIC_BROKER.name,
     phone: broker.phone || DEFAULT_PUBLIC_BROKER.phone,
     designation: broker.designation || DEFAULT_PUBLIC_BROKER.designation,
+    companyName: broker.companyName || DEFAULT_PUBLIC_BROKER.companyName,
     avatar: broker.avatar || DEFAULT_PUBLIC_BROKER.avatar,
   };
   return safe;

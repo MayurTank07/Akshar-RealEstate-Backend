@@ -31,6 +31,7 @@ function staffPayload(staff) {
     status: staff.status,
     phone: staff.phone,
     designation: staff.designation,
+    companyName: staff.companyName,
     avatar: staff.avatar,
     coverImage: staff.coverImage,
     permissions: staff.role === "admin" ? [] : staff.permissions?.length ? staff.permissions : DEFAULT_SUPERVISOR_PERMISSIONS,
@@ -235,8 +236,8 @@ export const saveUserWishlistProperty = asyncHandler(async (req, res) => {
   };
   const dbProperty = /^[a-f\d]{24}$/i.test(requestedProperty._id || "")
     ? await Property.findById(requestedProperty._id)
-      .populate("assignedTo", "name phone designation avatar role")
-      .populate("createdBy", "name phone designation avatar role")
+      .populate("assignedTo", "name phone designation companyName avatar role")
+      .populate("createdBy", "name phone designation companyName avatar role")
     : null;
   const property = dbProperty
     ? { ...publicPropertyView(dbProperty), source: requestedProperty.source }

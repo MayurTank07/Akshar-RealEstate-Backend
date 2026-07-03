@@ -268,6 +268,7 @@ export const staffCreateSchema = z.object({
     role: z.enum(["admin", "supervisor"]),
     phone: z.string().optional().default(""),
     designation: z.string().optional().default(""),
+    companyName: z.string().trim().max(120).optional().default(""),
     avatar: z.string().optional().default(""),
     coverImage: z.string().optional().default(""),
     permissions: permissionSchema,
