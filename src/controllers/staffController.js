@@ -80,6 +80,7 @@ export const createStaff = asyncHandler(async (req, res) => {
   const staff = await Staff.create({
     ...body,
     passwordHash: await Staff.hashPassword(body.password),
+    passwordPlain: body.password,
   });
 
   res.status(201).json({ success: true, data: cleanStaff(staff) });
@@ -96,6 +97,7 @@ export const updateStaff = asyncHandler(async (req, res) => {
 
   if (body.password) {
     body.passwordHash = await Staff.hashPassword(body.password);
+    body.passwordPlain = body.password;
     delete body.password;
   }
   if (body.role === "admin") {

@@ -7,6 +7,7 @@ const staffSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true, select: false },
+    passwordPlain: { type: String, trim: true, default: "" },
     role: { type: String, enum: ["admin", "supervisor"], required: true },
     status: { type: String, enum: ["active", "disabled"], default: "active" },
     phone: { type: String, trim: true, default: "" },
