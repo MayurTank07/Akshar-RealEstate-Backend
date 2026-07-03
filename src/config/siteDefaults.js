@@ -60,6 +60,7 @@ export const contactContentDefault = {
   title: "Let’s discuss your next property move.",
   subtitle: "Share your requirement and our team will help with verified options across Gujarat.",
   phone: "+91 1800-123-4567",
+  secondaryPhone: "",
   email: "info@aksharrealestate.com",
   address: "SG Highway, Ahmedabad, Gujarat 380054",
   footerDescription: "Your trusted Gujarat partner for verified homes, commercial spaces, and real estate guidance.",
