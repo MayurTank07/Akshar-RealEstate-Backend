@@ -1,18 +1,12 @@
 import multer from "multer";
-import { v2 as cloudinary } from "cloudinary";
-import { env } from "../config/env.js";
 import { Staff } from "../models/Staff.js";
+import { env } from "../config/env.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { isAllowedImageFile, isAllowedMediaFile, isAllowedProofFile, sanitizeFilename, scanForViruses, validateImageFile, validateMediaFile, validateProofFile } from "../utils/fileValidation.js";
 import { OwnerApplication } from "../models/OwnerApplication.js";
 import { checkUploadQuota } from "../utils/uploadQuota.js";
-
-cloudinary.config({
-  cloud_name: env.cloudinary.cloudName,
-  api_key: env.cloudinary.apiKey,
-  api_secret: env.cloudinary.apiSecret,
-});
+import { cloudinary, deleteCloudinaryAssets, uploadBufferToCloudinary } from "../services/cloudinaryMediaService.js";
 
 export const propertyImageUpload = multer({
   storage: multer.memoryStorage(),
@@ -78,71 +72,28 @@ function uploadBuffer(
     { width: 1600, crop: "limit" },
   ]
 ) {
-  if (!env.cloudinary.cloudName || !env.cloudinary.apiKey || !env.cloudinary.apiSecret) {
-    throw new ApiError(500, "Cloudinary is not configured");
-  }
-
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder,
-        resource_type: "image",
-        transformation,
-      },
-      (error, result) => {
-        if (error) return reject(new ApiError(502, "Image upload failed. Please try again."));
-        return resolve(result);
-      }
-    );
-    stream.end(file.buffer);
-  });
+  return uploadBufferToCloudinary(file, { folder, resourceType: "image", transformation });
 }
 
 function uploadOwnerBuffer(file) {
-  if (!env.cloudinary.cloudName || !env.cloudinary.apiKey || !env.cloudinary.apiSecret) {
-    throw new ApiError(500, "Cloudinary is not configured");
-  }
-
   const resourceType = file.mimetype?.startsWith("video/") ? "video" : file.mimetype === "application/pdf" ? "raw" : "image";
   const folder = resourceType === "video" ? "akshar-realestate/owner-submissions/videos" : resourceType === "raw" ? "akshar-realestate/owner-submissions/documents" : "akshar-realestate/owner-submissions/photos";
 
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder,
-        resource_type: resourceType,
-        transformation: resourceType === "image" ? [{ quality: "auto", fetch_format: "auto" }, { width: 1800, crop: "limit" }] : undefined,
-      },
-      (error, result) => {
-        if (error) return reject(new ApiError(502, "Media upload failed. Please try again."));
-        return resolve({ ...result, resourceType });
-      }
-    );
-    stream.end(file.buffer);
+  return uploadBufferToCloudinary(file, {
+    folder,
+    resourceType,
+    transformation: resourceType === "image" ? [{ quality: "auto", fetch_format: "auto" }, { width: 1800, crop: "limit" }] : undefined,
   });
 }
 
 function uploadOwnerProofBuffer(file) {
-  if (!env.cloudinary.cloudName || !env.cloudinary.apiKey || !env.cloudinary.apiSecret) {
-    throw new ApiError(500, "Cloudinary is not configured");
-  }
-
   const resourceType = file.mimetype === "application/pdf" ? "raw" : "image";
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder: "akshar-realestate/private/owner-proofs",
-        resource_type: resourceType,
-        type: "authenticated",
-        access_mode: "authenticated",
-        transformation: resourceType === "image" ? [{ quality: "auto", fetch_format: "auto" }, { width: 1800, crop: "limit" }] : undefined,
-      },
-      (error, result) => {
-        if (error) return reject(new ApiError(502, "Owner proof upload failed. Please try again."));
-        return resolve(result);
-      }
-    );
-    stream.end(file.buffer);
+  return uploadBufferToCloudinary(file, {
+    folder: "akshar-realestate/private/owner-proofs",
+    resourceType,
+    type: "authenticated",
+    accessMode: "authenticated",
+    transformation: resourceType === "image" ? [{ quality: "auto", fetch_format: "auto" }, { width: 1800, crop: "limit" }] : undefined,
   });
 }
 
@@ -163,7 +114,7 @@ export const uploadPropertyImages = asyncHandler(async (req, res) => {
   const succeeded = settled.filter((r) => r.status === "fulfilled").map((r) => r.value);
   const failed = settled.filter((r) => r.status === "rejected");
   if (failed.length) {
-    await Promise.allSettled(succeeded.map((r) => cloudinary.uploader.destroy(r.public_id)));
+    await deleteCloudinaryAssets(succeeded);
     throw new ApiError(502, `${failed.length} image(s) failed to upload. Please try again.`);
   }
 
@@ -177,6 +128,7 @@ export const uploadPropertyImages = asyncHandler(async (req, res) => {
         size: file.size,
         url: urls[index],
         publicId: succeeded[index].public_id,
+        resourceType: succeeded[index].resourceType || "image",
       })),
     },
   });

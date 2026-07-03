@@ -7,6 +7,7 @@ import { parsePagination } from "../utils/pagination.js";
 import { parseINRAmount } from "../utils/reporting.js";
 import { generatePropertyCode, isReadablePropertyCode, previewPropertyCode, syncPropertyCodeCounter } from "../services/propertyCodeService.js";
 import { publicPropertyView } from "../utils/publicProperty.js";
+import { deleteCloudinaryAssets, mediaAssetsFromProperty, removedCloudinaryAssets } from "../services/cloudinaryMediaService.js";
 
 const PROPERTY_SORT_FIELDS = ["createdAt", "updatedAt", "title", "city", "type", "status", "priceAmount"];
 
@@ -229,6 +230,15 @@ function validateDealDetails(body, existing) {
   }
 }
 
+async function cleanupPropertyMedia(assets = []) {
+  if (!assets.length) return;
+  try {
+    await deleteCloudinaryAssets(assets);
+  } catch (error) {
+    console.warn("Cloudinary media cleanup failed", error?.message || error);
+  }
+}
+
 export const publicProperties = asyncHandler(async (req, res) => {
   const filter = listQuery({ ...req.query, status: req.query.status || "active" }, { includePrivateSearch: false });
   filter.visibility = { $ne: "private" };
@@ -339,6 +349,7 @@ export const updateProperty = asyncHandler(async (req, res) => {
   if (!canAccessProperty(req.user, existing)) throw new ApiError(403, "You can only update assigned properties");
   const previousAssignedTo = existing.assignedTo?.toString();
   const previousStatus = existing.status;
+  const previousMediaAssets = mediaAssetsFromProperty(existing);
 
   const body = normalizeMoneyFields({ ...req.validated.body, updatedBy: req.user._id });
   normalizeNewProjectFlag(body);
@@ -371,6 +382,10 @@ export const updateProperty = asyncHandler(async (req, res) => {
 
   Object.assign(existing, body);
   await existing.save();
+  const removedMediaAssets = removedCloudinaryAssets(previousMediaAssets, mediaAssetsFromProperty(existing));
+  if (removedMediaAssets.length) {
+    await cleanupPropertyMedia(removedMediaAssets);
+  }
   await syncPropertyCodeCounter(existing.propertyCode);
   const statusChanged = previousStatus !== existing.status;
   const isDealStatus = ["sold", "rented"].includes(existing.status);
@@ -413,6 +428,7 @@ export const deleteProperty = asyncHandler(async (req, res) => {
     property.deletedBy = req.user._id;
     property.updatedBy = req.user._id;
     await property.save();
+    await cleanupPropertyMedia(mediaAssetsFromProperty(property));
     await Activity.create({
       type: "Property",
       title: "Property archived",
@@ -428,7 +444,9 @@ export const deleteProperty = asyncHandler(async (req, res) => {
     });
     return res.json({ success: true, data: { id: property._id, archived: true }, message: "Closed property archived and hidden from listings." });
   }
+  const mediaAssets = mediaAssetsFromProperty(property);
   await property.deleteOne();
+  await cleanupPropertyMedia(mediaAssets);
   await Activity.create({
     type: "Property",
     title: "Property deleted",

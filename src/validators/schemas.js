@@ -5,6 +5,14 @@ import { PROPERTY_OPTION_GROUPS } from "../config/propertyOptionDefaults.js";
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, "Invalid id");
 const mediaString = z.string().min(1);
 const stringArray = z.array(z.string().trim().min(1)).optional().default([]);
+const mediaAssetSchema = z.object({
+  url: z.string().trim().min(1),
+  publicId: z.string().trim().optional().default(""),
+  resourceType: z.string().trim().optional().default("image"),
+  originalName: z.string().trim().optional().default(""),
+  format: z.string().trim().optional().default(""),
+  size: z.coerce.number().min(0).optional().default(0),
+});
 const assignableId = z.union([objectId, z.literal(""), z.null()]).optional().transform((value) => value || null);
 const propertyTextLimit = 1000;
 const propertyDescription = z.string().trim().max(propertyTextLimit, "Property description must be 1000 characters or less");
@@ -151,6 +159,7 @@ export const propertySchema = z.object({
     ownerName: z.string().optional().default("Akshar Estate"),
     image: mediaString,
     gallery: z.array(mediaString).optional().default([]),
+    media: z.array(mediaAssetSchema).optional().default([]),
     description: propertyDescription.optional().default(""),
     nearbyLandmarks: nearbyLandmarksText.optional().default(""),
     videoUrl: z.string().optional().default(""),
@@ -162,6 +171,20 @@ export const propertySchema = z.object({
     floorNumber: z.string().optional().default(""),
     totalFloors: z.string().optional().default(""),
     furnishing: z.string().optional().default(""),
+    kitchen: z.string().optional().default(""),
+    balcony: z.string().optional().default(""),
+    landArea: z.string().optional().default(""),
+    plotSize: z.string().optional().default(""),
+    roadAccess: z.string().optional().default(""),
+    waterAvailability: z.string().optional().default(""),
+    electricityAvailability: z.string().optional().default(""),
+    zoning: z.string().optional().default(""),
+    frontage: z.string().optional().default(""),
+    washrooms: z.string().optional().default(""),
+    businessSuitability: z.string().optional().default(""),
+    pantry: z.string().optional().default(""),
+    loadingAccess: z.string().optional().default(""),
+    legalNotes: z.string().optional().default(""),
     ageOfProperty: z.string().optional().default(""),
     propertyTags: stringArray,
     isNewProject: z.coerce.boolean().optional().default(false),

@@ -92,7 +92,9 @@ async function createActivity({ title, description, category, priority = "normal
 
 function mapRequestToProperty(request, reviewer) {
   const details = request.propertyDetails || {};
-  const firstPhoto = request.media?.photos?.[0] || "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1600&q=80";
+  const photos = request.media?.photos || [];
+  const firstPhoto = photos[0];
+  if (!firstPhoto) throw new ApiError(422, "At least one uploaded property photo is required before approving this owner listing.");
   const sizeValue = details.builtUpArea || details.carpetArea || 0;
   const purpose = details.purpose || "sale";
 
@@ -114,7 +116,7 @@ function mapRequestToProperty(request, reviewer) {
     visibility: "public",
     ownerName: request.name,
     image: firstPhoto,
-    gallery: request.media?.photos || [firstPhoto],
+    gallery: photos,
     videoUrl: request.media?.videos?.[0] || "",
     description: details.description,
     nearbyLandmarks: details.nearbyLandmarks || "",
