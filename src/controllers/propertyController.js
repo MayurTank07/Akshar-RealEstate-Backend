@@ -245,8 +245,8 @@ export const publicProperties = asyncHandler(async (req, res) => {
   const { page, limit, skip, sort } = parsePagination(req.query, { allowedSortFields: PROPERTY_SORT_FIELDS });
   const [properties, total] = await Promise.all([
     Property.find(filter)
-      .populate("assignedTo", "name phone designation companyName avatar role")
-      .populate("createdBy", "name phone designation companyName avatar role")
+      .populate("assignedTo", "name phone whatsapp designation companyName avatar role")
+      .populate("createdBy", "name phone whatsapp designation companyName avatar role")
       .sort(sort)
       .skip(skip)
       .limit(limit),
@@ -257,8 +257,8 @@ export const publicProperties = asyncHandler(async (req, res) => {
 
 export const publicProperty = asyncHandler(async (req, res) => {
   const property = await Property.findOne({ _id: req.validated.params.id, status: "active", deletedAt: null, visibility: { $ne: "private" } })
-    .populate("assignedTo", "name phone designation companyName avatar role")
-    .populate("createdBy", "name phone designation companyName avatar role");
+    .populate("assignedTo", "name phone whatsapp designation companyName avatar role")
+    .populate("createdBy", "name phone whatsapp designation companyName avatar role");
   if (!property) throw new ApiError(404, "Property not found");
   res.json({ success: true, data: publicPropertyView(property) });
 });
@@ -268,7 +268,7 @@ export const listProperties = asyncHandler(async (req, res) => {
   const { page, limit, skip, sort } = parsePagination(req.query, { allowedSortFields: PROPERTY_SORT_FIELDS });
   const [properties, total] = await Promise.all([
     Property.find(filter)
-      .populate("assignedTo", "name email phone designation companyName avatar role")
+      .populate("assignedTo", "name email phone whatsapp designation companyName avatar role")
       .sort(sort)
       .skip(skip)
       .limit(limit),
@@ -278,7 +278,7 @@ export const listProperties = asyncHandler(async (req, res) => {
 });
 
 export const getProperty = asyncHandler(async (req, res) => {
-  const property = await Property.findById(req.validated.params.id).populate("assignedTo", "name email phone designation companyName avatar role");
+  const property = await Property.findById(req.validated.params.id).populate("assignedTo", "name email phone whatsapp designation companyName avatar role");
   if (!property) throw new ApiError(404, "Property not found");
   if (!canAccessProperty(req.user, property)) throw new ApiError(403, "You can only access assigned properties");
   res.json({ success: true, data: property });

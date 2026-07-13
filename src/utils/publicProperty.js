@@ -1,6 +1,8 @@
 const DEFAULT_PUBLIC_BROKER = {
   name: "Akshar Estate Expert",
   phone: "+91 1800-123-4567",
+  whatsapp: "",
+  hasDirectContact: false,
   designation: "Real Estate Expert",
   companyName: "Akshar Estate The Property HUB",
   avatar: "",
@@ -92,11 +94,25 @@ function sanitizePublicDescription(value = "") {
     .replace(/site visits?/gi, "property consultation");
 }
 
+function usableStaff(value) {
+  const staff = plainObject(value);
+  return staff && (staff.name || staff.phone || staff.whatsapp || staff.role) ? staff : null;
+}
+
 function publicBroker(property) {
-  const staff = plainObject(property.assignedTo || property.createdBy);
+  const createdBy = usableStaff(property.createdBy);
+  const assignedTo = usableStaff(property.assignedTo);
+  const staff =
+    (createdBy?.role === "supervisor" && createdBy) ||
+    (assignedTo?.role === "supervisor" && assignedTo) ||
+    createdBy ||
+    assignedTo ||
+    {};
   return {
     name: staff.name || DEFAULT_PUBLIC_BROKER.name,
     phone: staff.phone || DEFAULT_PUBLIC_BROKER.phone,
+    whatsapp: staff.whatsapp || staff.phone || DEFAULT_PUBLIC_BROKER.whatsapp,
+    hasDirectContact: Boolean(staff.whatsapp || staff.phone),
     designation: staff.designation || DEFAULT_PUBLIC_BROKER.designation,
     companyName: staff.companyName || DEFAULT_PUBLIC_BROKER.companyName,
     avatar: staff.avatar || DEFAULT_PUBLIC_BROKER.avatar,
@@ -131,6 +147,8 @@ export function sanitizeWishlistProperty(value) {
   safe.broker = {
     name: broker.name || DEFAULT_PUBLIC_BROKER.name,
     phone: broker.phone || DEFAULT_PUBLIC_BROKER.phone,
+    whatsapp: broker.hasDirectContact === false ? "" : broker.whatsapp || broker.phone || DEFAULT_PUBLIC_BROKER.whatsapp,
+    hasDirectContact: broker.hasDirectContact !== false && Boolean(broker.whatsapp || broker.phone),
     designation: broker.designation || DEFAULT_PUBLIC_BROKER.designation,
     companyName: broker.companyName || DEFAULT_PUBLIC_BROKER.companyName,
     avatar: broker.avatar || DEFAULT_PUBLIC_BROKER.avatar,

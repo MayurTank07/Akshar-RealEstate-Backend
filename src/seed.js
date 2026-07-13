@@ -96,7 +96,7 @@ const enquiries = [
   },
 ];
 
-async function upsertStaff({ name, email, password, role, propertiesManaged }) {
+async function upsertStaff({ name, email, password, role, propertiesManaged, phone = "", whatsapp = "" }) {
   const existing = await Staff.findOne({ email });
   if (existing) return existing;
 
@@ -105,6 +105,8 @@ async function upsertStaff({ name, email, password, role, propertiesManaged }) {
     email,
     role,
     propertiesManaged,
+    phone,
+    whatsapp: whatsapp || phone,
     passwordHash: await Staff.hashPassword(password),
   });
 }
@@ -118,6 +120,8 @@ async function seed() {
     password: "Admin@12345",
     role: "admin",
     propertiesManaged: 0,
+    phone: "+91 98765 43210",
+    whatsapp: "+91 98765 43210",
   });
   await upsertStaff({
     name: "Alex Martinez",
@@ -125,6 +129,8 @@ async function seed() {
     password: "Supervisor@12345",
     role: "supervisor",
     propertiesManaged: 45,
+    phone: "+91 98765 43211",
+    whatsapp: "+91 98765 43211",
   });
   await upsertStaff({
     name: "Sarah Chen",
@@ -132,6 +138,8 @@ async function seed() {
     password: "Supervisor@12345",
     role: "supervisor",
     propertiesManaged: 38,
+    phone: "+91 98765 43212",
+    whatsapp: "+91 98765 43212",
   });
 
   if ((await Property.countDocuments()) === 0) {

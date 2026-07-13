@@ -30,6 +30,7 @@ function staffPayload(staff) {
     role: staff.role,
     status: staff.status,
     phone: staff.phone,
+    whatsapp: staff.whatsapp,
     designation: staff.designation,
     companyName: staff.companyName,
     avatar: staff.avatar,
@@ -236,8 +237,8 @@ export const saveUserWishlistProperty = asyncHandler(async (req, res) => {
   };
   const dbProperty = /^[a-f\d]{24}$/i.test(requestedProperty._id || "")
     ? await Property.findById(requestedProperty._id)
-      .populate("assignedTo", "name phone designation companyName avatar role")
-      .populate("createdBy", "name phone designation companyName avatar role")
+      .populate("assignedTo", "name phone whatsapp designation companyName avatar role")
+      .populate("createdBy", "name phone whatsapp designation companyName avatar role")
     : null;
   const property = dbProperty
     ? { ...publicPropertyView(dbProperty), source: requestedProperty.source }
