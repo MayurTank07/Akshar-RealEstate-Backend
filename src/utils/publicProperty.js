@@ -101,7 +101,7 @@ function usableStaff(value) {
 
 function publicBroker(property) {
   const assignedTo = usableStaff(property.assignedTo);
-  const staff = ["admin", "supervisor"].includes(assignedTo?.role) ? assignedTo : null;
+  const staff = assignedTo?.role === "supervisor" ? assignedTo : null;
   if (!staff) return { ...DEFAULT_PUBLIC_BROKER };
   return {
     name: staff.name || DEFAULT_PUBLIC_BROKER.name,

@@ -1,6 +1,5 @@
 import { Activity } from "../models/Activity.js";
 import { Property } from "../models/Property.js";
-import { Staff } from "../models/Staff.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { escapeRegExp } from "../utils/escapeRegExp.js";
@@ -191,22 +190,6 @@ function activityTargets(...ids) {
   return [...new Set(ids.filter(Boolean).map((id) => id.toString()))];
 }
 
-async function normalizeAssignedStaff(body, user) {
-  if (user.role === "supervisor") {
-    body.assignedTo = user._id;
-    return;
-  }
-  if (!body.assignedTo) {
-    body.assignedTo = null;
-    return;
-  }
-  const staff = await Staff.findOne({ _id: body.assignedTo, status: "active", role: { $in: ["admin", "supervisor"] } }).select("_id");
-  if (!staff) {
-    throw new ApiError(422, "Assigned Supervisor must be an active admin or supervisor account.");
-  }
-  body.assignedTo = staff._id;
-}
-
 function normalizeMoneyFields(body) {
   if ("price" in body || "priceAmount" in body) {
     body.priceAmount = body.priceAmount || parseINRAmount(body.price);
@@ -319,7 +302,9 @@ export const createProperty = asyncHandler(async (req, res) => {
   const body = { ...req.validated.body };
   normalizeMoneyFields(body);
   normalizeNewProjectFlag(body);
-  await normalizeAssignedStaff(body, req.user);
+  if (req.user.role === "supervisor") {
+    body.assignedTo = req.user._id;
+  }
   if (body.dealDate === "") body.dealDate = null;
   if (body.status === "sold" || body.status === "rented") {
     body.dealSource = body.dealSource || "manual";
@@ -368,7 +353,9 @@ export const updateProperty = asyncHandler(async (req, res) => {
 
   const body = normalizeMoneyFields({ ...req.validated.body, updatedBy: req.user._id });
   normalizeNewProjectFlag(body);
-  await normalizeAssignedStaff(body, req.user);
+  if (req.user.role === "supervisor") {
+    delete body.assignedTo;
+  }
   if (body.status && body.status !== previousStatus) {
     body.statusUpdatedAt = new Date();
     body.statusUpdatedBy = req.user._id;
