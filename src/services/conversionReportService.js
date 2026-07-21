@@ -110,7 +110,7 @@ function propertyRow(item) {
     propertyType: item.type || "",
     category: item.category || "",
     propertyStatus: item.status || "",
-    customer: item.dealCustomerName || item.contact?.name || item.ownerName || "Direct property status",
+    customer: item.dealCustomerName || item.contact?.name || item.ownerSellerName || item.ownerName || "Direct property status",
     phone: item.dealCustomerPhone || item.contact?.phone || "",
     email: item.dealCustomerEmail || item.contact?.email || "",
     supervisor: item.assignedTo?.name || item.createdBy?.name || "",

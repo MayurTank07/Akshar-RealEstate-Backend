@@ -42,6 +42,7 @@ const propertySchema = new mongoose.Schema(
     visibility: { type: String, enum: ["public", "private"], default: "public" },
     featured: { type: Boolean, default: false },
     ownerName: { type: String, trim: true, default: "Akshar Estate" },
+    ownerSellerName: { type: String, trim: true, default: "" },
     image: { type: String, required: true, trim: true },
     gallery: [{ type: String, trim: true }],
     media: [
@@ -133,7 +134,7 @@ const propertySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-propertySchema.index({ title: "text", location: "text", city: "text", type: "text", ownerName: "text", developerName: "text", topProject: "text", topDeveloper: "text", dealType: "text", propertyCode: "text", status: "text", category: "text", propertyStatus: "text" });
+propertySchema.index({ title: "text", location: "text", city: "text", type: "text", ownerName: "text", ownerSellerName: "text", developerName: "text", topProject: "text", topDeveloper: "text", dealType: "text", propertyCode: "text", status: "text", category: "text", propertyStatus: "text" });
 propertySchema.index({ status: 1, statusUpdatedAt: -1, assignedTo: 1, createdBy: 1 });
 propertySchema.index({ isNewProject: 1, status: 1, createdAt: -1 });
 propertySchema.index({ propertyCode: 1 }, { unique: true, partialFilterExpression: { propertyCode: { $type: "string", $gt: "" } } });

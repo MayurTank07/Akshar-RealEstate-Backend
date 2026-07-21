@@ -1,6 +1,6 @@
 const DEFAULT_PUBLIC_BROKER = {
-  name: "Akshar Estate Expert",
-  phone: "+91 1800-123-4567",
+  name: "Contact our property expert",
+  phone: "",
   whatsapp: "",
   hasDirectContact: false,
   designation: "Real Estate Expert",
@@ -100,18 +100,13 @@ function usableStaff(value) {
 }
 
 function publicBroker(property) {
-  const createdBy = usableStaff(property.createdBy);
   const assignedTo = usableStaff(property.assignedTo);
-  const staff =
-    (createdBy?.role === "supervisor" && createdBy) ||
-    (assignedTo?.role === "supervisor" && assignedTo) ||
-    createdBy ||
-    assignedTo ||
-    {};
+  const staff = assignedTo?.role === "supervisor" ? assignedTo : null;
+  if (!staff) return { ...DEFAULT_PUBLIC_BROKER };
   return {
     name: staff.name || DEFAULT_PUBLIC_BROKER.name,
-    phone: staff.phone || DEFAULT_PUBLIC_BROKER.phone,
-    whatsapp: staff.whatsapp || staff.phone || DEFAULT_PUBLIC_BROKER.whatsapp,
+    phone: staff.phone || "",
+    whatsapp: staff.whatsapp || staff.phone || "",
     hasDirectContact: Boolean(staff.whatsapp || staff.phone),
     designation: staff.designation || DEFAULT_PUBLIC_BROKER.designation,
     companyName: staff.companyName || DEFAULT_PUBLIC_BROKER.companyName,

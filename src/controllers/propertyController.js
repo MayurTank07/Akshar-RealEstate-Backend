@@ -122,7 +122,7 @@ function tokenSearchFilter(token, includePrivateSearch) {
   const bhk = token.match(/^(\d+)bhk$/);
   if (bhk) return { beds: Number(bhk[1]) };
   const pattern = new RegExp(escapeRegExp(token), "i");
-  const fields = includePrivateSearch ? [...SEARCH_FIELDS, "ownerName"] : SEARCH_FIELDS;
+  const fields = includePrivateSearch ? [...SEARCH_FIELDS, "ownerName", "ownerSellerName"] : SEARCH_FIELDS;
   return { $or: fields.map((field) => ({ [field]: pattern })) };
 }
 

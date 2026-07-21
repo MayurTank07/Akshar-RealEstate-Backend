@@ -158,6 +158,7 @@ export const propertySchema = z.object({
     visibility: z.enum(["public", "private"]).optional().default("public"),
     featured: z.coerce.boolean().optional().default(false),
     ownerName: z.string().optional().default("Akshar Estate"),
+    ownerSellerName: z.string().trim().max(120, "Owner / Seller name must be 120 characters or less").optional().default(""),
     image: mediaString,
     gallery: z.array(mediaString).optional().default([]),
     media: z.array(mediaAssetSchema).optional().default([]),

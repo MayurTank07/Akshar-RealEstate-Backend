@@ -256,14 +256,14 @@ async function buildDealReport(type, user, query = {}) {
 
 async function buildSimpleRows(type, user) {
   if (type === "properties") {
-    return (await Property.find(propertyScope(user)).populate("assignedTo", "name email").lean()).map(({ title, propertyCode, location, city, price, status, ownerName, type: propertyType, assignedTo, createdAt }) => ({
+    return (await Property.find(propertyScope(user)).populate("assignedTo", "name email").lean()).map(({ title, propertyCode, location, city, price, status, ownerName, ownerSellerName, type: propertyType, assignedTo, createdAt }) => ({
       propertyCode,
       title,
       location,
       city,
       price,
       status,
-      ownerName,
+      ownerName: ownerSellerName || ownerName,
       propertyType,
       supervisor: assignedTo?.name || "",
       createdAt: createdAt?.toISOString?.().slice(0, 10) || "",

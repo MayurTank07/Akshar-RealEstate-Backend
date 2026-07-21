@@ -115,6 +115,7 @@ function mapRequestToProperty(request, reviewer) {
     availability: details.availability || "Available",
     visibility: "public",
     ownerName: request.name,
+    ownerSellerName: request.name,
     image: firstPhoto,
     gallery: photos,
     videoUrl: request.media?.videos?.[0] || "",

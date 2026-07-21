@@ -25,6 +25,7 @@ const properties = [
     badgeColor: "bg-blue-600",
     status: "active",
     ownerName: "Sarah Johnson",
+    ownerSellerName: "Sarah Johnson",
     image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=900",
     source: "home",
   },
@@ -43,6 +44,7 @@ const properties = [
     badgeColor: "bg-emerald-500",
     status: "pending",
     ownerName: "Sarah Johnson",
+    ownerSellerName: "Sarah Johnson",
     image,
     source: "pricing",
   },
@@ -61,6 +63,7 @@ const properties = [
     badgeColor: "bg-blue-600",
     status: "active",
     ownerName: "Hitesh Patel",
+    ownerSellerName: "Hitesh Patel",
     image: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80&w=900",
     source: "pricing",
   },
@@ -96,7 +99,7 @@ const enquiries = [
   },
 ];
 
-async function upsertStaff({ name, email, password, role, propertiesManaged, phone = "", whatsapp = "" }) {
+async function upsertStaff({ name, email, password, role, propertiesManaged, phone = "", whatsapp = "", companyName = "" }) {
   const existing = await Staff.findOne({ email });
   if (existing) return existing;
 
@@ -107,6 +110,7 @@ async function upsertStaff({ name, email, password, role, propertiesManaged, pho
     propertiesManaged,
     phone,
     whatsapp: whatsapp || phone,
+    companyName,
     passwordHash: await Staff.hashPassword(password),
   });
 }
@@ -122,6 +126,7 @@ async function seed() {
     propertiesManaged: 0,
     phone: "+91 98765 43210",
     whatsapp: "+91 98765 43210",
+    companyName: "Akshar Estate The Property HUB",
   });
   await upsertStaff({
     name: "Alex Martinez",
@@ -131,6 +136,7 @@ async function seed() {
     propertiesManaged: 45,
     phone: "+91 98765 43211",
     whatsapp: "+91 98765 43211",
+    companyName: "Akshar Estate The Property HUB",
   });
   await upsertStaff({
     name: "Sarah Chen",
@@ -140,6 +146,7 @@ async function seed() {
     propertiesManaged: 38,
     phone: "+91 98765 43212",
     whatsapp: "+91 98765 43212",
+    companyName: "Akshar Estate The Property HUB",
   });
 
   if ((await Property.countDocuments()) === 0) {
