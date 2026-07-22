@@ -7,6 +7,7 @@ import { isAllowedImageFile, isAllowedMediaFile, isAllowedProofFile, sanitizeFil
 import { OwnerApplication } from "../models/OwnerApplication.js";
 import { checkUploadQuota } from "../utils/uploadQuota.js";
 import { cloudinary, deleteCloudinaryAssets, uploadBufferToCloudinary } from "../services/cloudinaryMediaService.js";
+import { slugify } from "../utils/slugify.js";
 
 export const propertyImageUpload = multer({
   storage: multer.memoryStorage(),
@@ -70,9 +71,26 @@ function uploadBuffer(
   transformation = [
     { quality: "auto", fetch_format: "auto" },
     { width: 1600, crop: "limit" },
-  ]
+  ],
+  publicId = ""
 ) {
-  return uploadBufferToCloudinary(file, { folder, resourceType: "image", transformation });
+  return uploadBufferToCloudinary(file, { folder, resourceType: "image", transformation, publicId });
+}
+
+function propertyImagePublicId(req, file, index) {
+  const title = req.body?.propertyTitle || req.body?.title || "property";
+  const location = req.body?.location || req.body?.city || "gujarat";
+  const original = sanitizeFilename(file.originalname).replace(/\.[a-z0-9]+$/i, "");
+  const originalSlug = slugify(original);
+  const fallbackViews = ["exterior-view", "living-room", "bedroom", "kitchen", "balcony", "interior-view", "entrance-view", "floor-plan"];
+  const view = /living|hall/.test(originalSlug) ? "living-room"
+    : /bed/.test(originalSlug) ? "bedroom"
+      : /kitchen/.test(originalSlug) ? "kitchen"
+        : /balcony/.test(originalSlug) ? "balcony"
+          : /floor|plan/.test(originalSlug) ? "floor-plan"
+            : fallbackViews[index % fallbackViews.length];
+  const base = slugify([title, location, view].filter(Boolean).join(" "));
+  return `${base || "akshar-estate-property-image"}-${Date.now().toString(36)}-${index + 1}`;
 }
 
 function uploadOwnerBuffer(file) {
@@ -110,7 +128,10 @@ export const uploadPropertyImages = asyncHandler(async (req, res) => {
 
   checkUploadQuota(req.ip || "", files.reduce((s, f) => s + f.size, 0), 500 * 1024 * 1024);
 
-  const settled = await Promise.allSettled(files.map((file) => uploadBuffer(file)));
+  const settled = await Promise.allSettled(files.map((file, index) => uploadBuffer(file, "akshar-realestate/properties", [
+    { quality: "auto", fetch_format: "auto" },
+    { width: 1600, crop: "limit" },
+  ], propertyImagePublicId(req, file, index))));
   const succeeded = settled.filter((r) => r.status === "fulfilled").map((r) => r.value);
   const failed = settled.filter((r) => r.status === "rejected");
   if (failed.length) {
@@ -118,7 +139,14 @@ export const uploadPropertyImages = asyncHandler(async (req, res) => {
     throw new ApiError(502, `${failed.length} image(s) failed to upload. Please try again.`);
   }
 
-  const urls = succeeded.map((r) => r.secure_url);
+  const urls = succeeded.map((r) => cloudinary.url(r.public_id, {
+    secure: true,
+    resource_type: "image",
+    transformation: [
+      { quality: "auto", fetch_format: "auto" },
+      { width: 1600, crop: "limit" },
+    ],
+  }));
   res.status(201).json({
     success: true,
     data: {

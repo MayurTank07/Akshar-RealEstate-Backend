@@ -25,6 +25,7 @@ export function uploadBufferToCloudinary(
     ],
     type,
     accessMode,
+    publicId,
   } = {}
 ) {
   assertCloudinaryConfigured();
@@ -35,6 +36,7 @@ export function uploadBufferToCloudinary(
         folder,
         resource_type: resourceType,
         transformation,
+        ...(publicId ? { public_id: publicId, unique_filename: true, overwrite: false } : {}),
         ...(type ? { type } : {}),
         ...(accessMode ? { access_mode: accessMode } : {}),
       },
