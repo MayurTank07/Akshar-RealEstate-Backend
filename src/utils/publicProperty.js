@@ -101,8 +101,6 @@ const PUBLIC_PROPERTY_FIELDS = [
   "district",
   "latitude",
   "longitude",
-  "assignedSupervisor",
-  "sellerName",
   "source",
   "createdAt",
   "updatedAt",
