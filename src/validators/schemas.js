@@ -329,6 +329,61 @@ export const enquiryCreateSchema = z.object({
   }),
 });
 
+export const analyticsEventSchema = z.object({
+  body: z.object({
+    eventName: z.enum([
+      "property_page_view",
+      "search_performed",
+      "location_selected",
+      "filter_applied",
+      "property_image_opened",
+      "call_button_clicked",
+      "whatsapp_button_clicked",
+      "inquiry_form_opened",
+      "inquiry_form_submitted",
+      "supervisor_contacted",
+      "property_shared",
+      "map_opened",
+    ]),
+    propertyId: assignableId.optional().nullable(),
+    propertySlug: z.string().trim().max(180).optional().default(""),
+    slug: z.string().trim().max(180).optional().default(""),
+    propertyTitle: z.string().trim().max(180).optional().default(""),
+    location: z.string().trim().max(120).optional().default(""),
+    city: z.string().trim().max(120).optional().default(""),
+    propertyType: z.string().trim().max(120).optional().default(""),
+    bhk: z.coerce.number().min(0).optional().default(0),
+    listingType: z.string().trim().max(80).optional().default(""),
+    assignedSupervisor: z
+      .object({
+        id: z.string().trim().max(80).optional().default(""),
+        name: z.string().trim().max(120).optional().default(""),
+        companyName: z.string().trim().max(120).optional().default(""),
+      })
+      .optional()
+      .default({ id: "", name: "", companyName: "" }),
+    pagePath: z.string().trim().max(300).optional().default(""),
+    pageTitle: z.string().trim().max(180).optional().default(""),
+    referrer: z.string().trim().max(300).optional().default(""),
+    source: z.string().trim().max(120).optional().default(""),
+    campaign: z
+      .object({
+        utmSource: z.string().trim().max(180).optional().default(""),
+        utmMedium: z.string().trim().max(180).optional().default(""),
+        utmCampaign: z.string().trim().max(180).optional().default(""),
+        utmTerm: z.string().trim().max(180).optional().default(""),
+        utmContent: z.string().trim().max(180).optional().default(""),
+        gclid: z.string().trim().max(180).optional().default(""),
+        fbclid: z.string().trim().max(180).optional().default(""),
+        ref: z.string().trim().max(180).optional().default(""),
+        supervisor: z.string().trim().max(180).optional().default(""),
+      })
+      .optional()
+      .default({}),
+    metadata: z.record(z.any()).optional().default({}),
+  }),
+});
+
 export const enquiryUpdateSchema = z.object({
   body: enquiryCreateSchema.shape.body.partial().extend({
     assignedTo: objectId.optional().nullable(),

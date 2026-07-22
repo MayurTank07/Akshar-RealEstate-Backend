@@ -7,10 +7,11 @@ import { createOwnerRequest, deleteMyOwnerRequest, listMyOwnerRequests, requestO
 import { listPropertyOptions } from "../controllers/propertyOptionController.js";
 import { listLocations } from "../controllers/locationController.js";
 import { publicProperties, publicProperty, publicPropertyBySlug } from "../controllers/propertyController.js";
+import { trackAnalyticsEvent } from "../controllers/trackingController.js";
 import { getOwnerUploadToken, ownerMediaUpload, ownerProofUpload, uploadOwnerMedia, uploadOwnerProofs } from "../controllers/uploadController.js";
 import { authenticateUser } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
-import { enquiryCreateSchema, idParamSchema, ownerDeleteRequestSchema, ownerRequestSchema } from "../validators/schemas.js";
+import { analyticsEventSchema, enquiryCreateSchema, idParamSchema, ownerDeleteRequestSchema, ownerRequestSchema } from "../validators/schemas.js";
 
 const router = Router();
 
@@ -24,6 +25,7 @@ router.get("/blogs/:slug", getPublicBlogBySlug);
 router.post("/enquiries", validate(enquiryCreateSchema), createPublicEnquiry);
 router.get("/content", publicContent);
 router.get("/certifications", listPublicCertifications);
+router.post("/analytics/events", validate(analyticsEventSchema), trackAnalyticsEvent);
 router.get("/owner/properties", authenticateUser, listMyOwnerRequests);
 router.post("/owner/properties", authenticateUser, validate(ownerRequestSchema), createOwnerRequest);
 router.put("/owner/properties/:id", authenticateUser, validate(idParamSchema), validate(ownerRequestSchema), updateMyOwnerRequest);

@@ -130,6 +130,7 @@ function publicBroker(property) {
   const staff = assignedTo?.role === "supervisor" ? assignedTo : null;
   if (!staff) return { ...DEFAULT_PUBLIC_BROKER };
   return {
+    id: staff._id ? staff._id.toString() : "",
     name: staff.name || DEFAULT_PUBLIC_BROKER.name,
     phone: staff.phone || "",
     whatsapp: staff.whatsapp || staff.phone || "",

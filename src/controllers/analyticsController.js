@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 import { Activity } from "../models/Activity.js";
+import { AnalyticsEvent } from "../models/AnalyticsEvent.js";
 import { Enquiry } from "../models/Enquiry.js";
+import { Location } from "../models/Location.js";
 import { OwnerApplication } from "../models/OwnerApplication.js";
 import { Property } from "../models/Property.js";
 import { Staff } from "../models/Staff.js";
@@ -41,6 +43,26 @@ function enquiryScope(user, query = {}, dateField = "createdAt") {
 function activityScope(user) {
   if (user.role === "admin") return {};
   return { $or: [{ actorId: user._id }, { targetStaffIds: user._id }] };
+}
+
+function eventScope(user, query = {}) {
+  const filter = { ...dateMatch("createdAt", query) };
+  if (user.role === "supervisor") {
+    filter["assignedSupervisor.id"] = user._id.toString();
+  } else if (query.supervisorId && query.supervisorId !== "all") {
+    filter["assignedSupervisor.id"] = query.supervisorId;
+  }
+  if (query.city && query.city !== "all") filter.city = new RegExp(escapeRegExp(query.city), "i");
+  if (query.propertyType && query.propertyType !== "all") filter.propertyType = new RegExp(`^${escapeRegExp(query.propertyType)}$`, "i");
+  return filter;
+}
+
+function seoPropertyScope(base = {}) {
+  return { ...base, status: "active", deletedAt: null, visibility: { $ne: "private" } };
+}
+
+function eventChartItems(stats, labelKey = "_id") {
+  return stats.map((item) => ({ label: item[labelKey] || "Unknown", value: item.value || 0 }));
 }
 
 function lastSevenDays() {
@@ -241,6 +263,20 @@ export const analytics = asyncHandler(async (req, res) => {
     ownerSubmissionStats,
     sellerOwnerListings,
     sourceBreakdown,
+    indexableProperties,
+    propertiesWithoutSeoTitles,
+    propertiesWithoutDescriptions,
+    propertiesWithoutImages,
+    propertiesWithoutAltText,
+    emptyLocationPages,
+    recentlyUpdatedProperties,
+    mostViewedProperties,
+    mostContactedSupervisors,
+    callClickEvents,
+    whatsappClickEvents,
+    inquirySubmissionEvents,
+    eventTypeStats,
+    campaignSourceStats,
   ] = await Promise.all([
     Enquiry.countDocuments(enquiries),
     Enquiry.countDocuments({ ...enquiries, status: "closed" }),
@@ -291,6 +327,53 @@ export const analytics = asyncHandler(async (req, res) => {
       : Promise.resolve([]),
     Property.countDocuments({ ...properties, source: "seller_owner" }),
     Property.aggregate([{ $match: properties }, { $group: { _id: "$source", value: { $sum: 1 } } }, { $sort: { value: -1 } }]),
+    Property.countDocuments({ ...seoPropertyScope(properties), isIndexable: true }),
+    Property.countDocuments({
+      ...seoPropertyScope(properties),
+      $and: [
+        { $or: [{ seoTitle: "" }, { seoTitle: { $exists: false } }] },
+        { $or: [{ "seo.metaTitle": "" }, { "seo.metaTitle": { $exists: false } }] },
+      ],
+    }),
+    Property.countDocuments({ ...seoPropertyScope(properties), $or: [{ description: "" }, { description: { $exists: false } }, { metaDescription: "" }, { metaDescription: { $exists: false } }] }),
+    Property.countDocuments({
+      ...seoPropertyScope(properties),
+      $and: [
+        { $or: [{ image: "" }, { image: { $exists: false } }] },
+        { $or: [{ gallery: { $exists: false } }, { gallery: { $size: 0 } }] },
+        { $or: [{ images: { $exists: false } }, { images: { $size: 0 } }] },
+      ],
+    }),
+    Property.countDocuments({
+      ...seoPropertyScope(properties),
+      $or: [
+        { imageAltTexts: { $exists: false } },
+        { imageAltTexts: { $size: 0 } },
+      ],
+    }),
+    req.user.role === "admin" ? Location.countDocuments({ isActive: true, isIndexable: true, propertyCount: { $lte: 0 } }) : Promise.resolve(0),
+    Property.find(seoPropertyScope(properties))
+      .populate("assignedTo", "name email")
+      .sort({ lastModifiedAt: -1, updatedAt: -1 })
+      .limit(8)
+      .select("title slug city location type status isIndexable lastModifiedAt updatedAt assignedTo"),
+    AnalyticsEvent.aggregate([
+      { $match: { ...eventScope(req.user, req.query), eventName: "property_page_view" } },
+      { $group: { _id: { slug: "$propertySlug", title: "$propertyTitle", location: "$location", city: "$city" }, value: { $sum: 1 } } },
+      { $sort: { value: -1 } },
+      { $limit: 8 },
+    ]),
+    AnalyticsEvent.aggregate([
+      { $match: { ...eventScope(req.user, req.query), eventName: { $in: ["call_button_clicked", "whatsapp_button_clicked", "supervisor_contacted"] } } },
+      { $group: { _id: { id: "$assignedSupervisor.id", name: "$assignedSupervisor.name", companyName: "$assignedSupervisor.companyName" }, value: { $sum: 1 } } },
+      { $sort: { value: -1 } },
+      { $limit: 8 },
+    ]),
+    AnalyticsEvent.countDocuments({ ...eventScope(req.user, req.query), eventName: "call_button_clicked" }),
+    AnalyticsEvent.countDocuments({ ...eventScope(req.user, req.query), eventName: "whatsapp_button_clicked" }),
+    AnalyticsEvent.countDocuments({ ...eventScope(req.user, req.query), eventName: "inquiry_form_submitted" }),
+    AnalyticsEvent.aggregate([{ $match: eventScope(req.user, req.query) }, { $group: { _id: "$eventName", value: { $sum: 1 } } }, { $sort: { value: -1 } }]),
+    AnalyticsEvent.aggregate([{ $match: eventScope(req.user, req.query) }, { $group: { _id: "$campaign.utmSource", value: { $sum: 1 } } }, { $sort: { value: -1 } }, { $limit: 8 }]),
   ]);
 
   const soldRentedTotals = summarizeSoldRentedRows(soldRentedRows);
@@ -378,6 +461,15 @@ export const analytics = asyncHandler(async (req, res) => {
         approvedOwnerSubmissions: ownerSubmissionStats.find((item) => item._id === "approved")?.value || 0,
         rejectedOwnerSubmissions: ownerSubmissionStats.find((item) => item._id === "rejected")?.value || 0,
         sellerOwnerListings,
+        indexableProperties,
+        propertiesWithoutSeoTitles,
+        propertiesWithoutDescriptions,
+        propertiesWithoutImages,
+        propertiesWithoutAltText,
+        emptyLocationPages,
+        callClicks: callClickEvents,
+        whatsappClicks: whatsappClickEvents,
+        inquirySubmissions: inquirySubmissionEvents || totalLeads,
       },
       weekly,
       monthly,
@@ -389,6 +481,40 @@ export const analytics = asyncHandler(async (req, res) => {
       ],
       propertyTypes: chartItems(typeStats),
       sourceBreakdown: chartItems(sourceBreakdown),
+      seoHealth: [
+        { label: "Total Active Properties", value: activeListings },
+        { label: "Indexable Properties", value: indexableProperties },
+        { label: "Without SEO Titles", value: propertiesWithoutSeoTitles },
+        { label: "Without Descriptions", value: propertiesWithoutDescriptions },
+        { label: "Without Images", value: propertiesWithoutImages },
+        { label: "Without Alt Text", value: propertiesWithoutAltText },
+        { label: "Empty Location Pages", value: emptyLocationPages },
+      ],
+      recentlyUpdatedProperties: recentlyUpdatedProperties.map((property) => ({
+        id: property._id,
+        title: property.title,
+        slug: property.slug,
+        city: property.city,
+        location: property.location,
+        type: property.type,
+        status: property.status,
+        isIndexable: property.isIndexable,
+        supervisor: property.assignedTo?.name || "",
+        updatedAt: property.lastModifiedAt || property.updatedAt,
+      })),
+      mostViewedProperties: mostViewedProperties.map((item) => ({
+        title: item._id?.title || item._id?.slug || "Unknown property",
+        slug: item._id?.slug || "",
+        location: [item._id?.location, item._id?.city].filter(Boolean).join(", "),
+        value: item.value,
+      })),
+      mostContactedSupervisors: mostContactedSupervisors.map((item) => ({
+        name: item._id?.name || "Unassigned",
+        companyName: item._id?.companyName || "",
+        value: item.value,
+      })),
+      eventTypes: eventChartItems(eventTypeStats),
+      campaignSources: eventChartItems(campaignSourceStats.filter((item) => item._id)),
       cityStats: [...mergedCityStats.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value).slice(0, 8),
       propertyStats: [...mergedPropertyStats.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value).slice(0, 8),
       supervisorPerformance: supervisorStats,
