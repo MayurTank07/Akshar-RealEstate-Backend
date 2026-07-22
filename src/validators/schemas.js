@@ -506,6 +506,24 @@ export const contentUpdateSchema = z.object({
   }),
 });
 
+export const blogSchema = z.object({
+  body: z.object({
+    title: z.string().trim().min(3, "Blog title is required").max(180),
+    slug: z.string().trim().max(180).optional().default(""),
+    excerpt: z.string().trim().max(500).optional().default(""),
+    body: z.string().trim().max(30000).optional().default(""),
+    featuredImage: z.string().trim().max(1000).optional().default(""),
+    metaTitle: z.string().trim().max(90, "Meta title should stay under 90 characters").optional().default(""),
+    metaDescription: z.string().trim().max(180, "Meta description should stay under 180 characters").optional().default(""),
+    author: z.string().trim().max(120).optional().default("Akshar Estate Editorial Team"),
+    publishedAt: z.union([z.coerce.date(), z.literal(""), z.null()]).optional().default(null),
+    category: z.string().trim().max(120).optional().default("Buying Guide"),
+    relatedLocations: z.array(z.string().trim().min(1).max(120)).optional().default([]),
+    status: z.enum(["draft", "published"]).optional().default("draft"),
+    isIndexable: z.coerce.boolean().optional().default(false),
+  }),
+});
+
 export const certificationCreateSchema = z.object({
   body: z.object({
     title: z.string().trim().optional().default(""),

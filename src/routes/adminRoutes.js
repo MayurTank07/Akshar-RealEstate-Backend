@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { analytics, dashboard } from "../controllers/analyticsController.js";
+import { createBlog, deleteBlog, listAdminBlogs, updateBlog } from "../controllers/blogController.js";
 import { updateContent } from "../controllers/contentController.js";
 import { deleteEnquiry, listEnquiries, updateEnquiry } from "../controllers/enquiryController.js";
 import { listNotifications, markAllNotificationsRead, markNotificationRead } from "../controllers/notificationController.js";
@@ -22,6 +23,7 @@ import {
   enquiryUpdateSchema,
   ownerDeleteReviewSchema,
   ownerAdminUpdateSchema,
+  blogSchema,
   idParamSchema,
   ownerStatusSchema,
   propertyOptionCreateSchema,
@@ -81,6 +83,10 @@ router.patch("/users/:id/status", authorize("admin"), validate(idParamSchema), v
 router.delete("/users/:id", authorize("admin"), validate(idParamSchema), deleteUser);
 
 router.put("/content/:id", authorize("admin"), validate(idParamSchema), validate(contentUpdateSchema), updateContent);
+router.get("/blogs", authorize("admin"), listAdminBlogs);
+router.post("/blogs", authorize("admin"), validate(blogSchema), createBlog);
+router.put("/blogs/:id", authorize("admin"), validate(idParamSchema), validate(blogSchema), updateBlog);
+router.delete("/blogs/:id", authorize("admin"), validate(idParamSchema), deleteBlog);
 router.get("/reports/sold-rented", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.REPORTS_EXPORT, PERMISSIONS.ANALYTICS_ACCESS), listSoldRentedReports);
 router.get("/reports/export", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.REPORTS_EXPORT, PERMISSIONS.ANALYTICS_ACCESS), exportReport);
 

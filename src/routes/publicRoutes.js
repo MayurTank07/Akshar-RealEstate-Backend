@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { getPublicBlogBySlug, listPublicBlogs } from "../controllers/blogController.js";
 import { publicContent } from "../controllers/contentController.js";
 import { listPublicCertifications } from "../controllers/certificationController.js";
 import { createPublicEnquiry } from "../controllers/enquiryController.js";
@@ -18,6 +19,8 @@ router.get("/properties/slug/:slug", publicPropertyBySlug);
 router.get("/properties/:id", validate(idParamSchema), publicProperty);
 router.get("/property-options", listPropertyOptions);
 router.get("/locations", listLocations);
+router.get("/blogs", listPublicBlogs);
+router.get("/blogs/:slug", getPublicBlogBySlug);
 router.post("/enquiries", validate(enquiryCreateSchema), createPublicEnquiry);
 router.get("/content", publicContent);
 router.get("/certifications", listPublicCertifications);
