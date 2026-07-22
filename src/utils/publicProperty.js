@@ -11,6 +11,7 @@ const DEFAULT_PUBLIC_BROKER = {
 const PUBLIC_PROPERTY_FIELDS = [
   "_id",
   "id",
+  "locationRef",
   "title",
   "location",
   "city",
@@ -117,6 +118,20 @@ function publicBroker(property) {
 export function publicPropertyView(value) {
   const property = plainObject(value);
   const safe = pick(property, PUBLIC_PROPERTY_FIELDS);
+  if (safe.locationRef && typeof safe.locationRef === "object") {
+    safe.locationMaster = {
+      _id: safe.locationRef._id,
+      name: safe.locationRef.name || "",
+      gujaratiName: safe.locationRef.gujaratiName || "",
+      slug: safe.locationRef.slug || "",
+      city: safe.locationRef.city || "",
+      state: safe.locationRef.state || "",
+      locationType: safe.locationRef.locationType || "",
+      isIndexable: Boolean(safe.locationRef.isIndexable),
+      verificationStatus: safe.locationRef.verificationStatus || "needsVerification",
+    };
+    safe.locationRef = safe.locationRef._id;
+  }
   if (safe.description) safe.description = sanitizePublicDescription(safe.description);
   const map = plainObject(property.map);
   safe.map = {
@@ -131,6 +146,20 @@ export function publicPropertyView(value) {
 export function sanitizeWishlistProperty(value) {
   const property = plainObject(value);
   const safe = pick(property, PUBLIC_PROPERTY_FIELDS);
+  if (safe.locationRef && typeof safe.locationRef === "object") {
+    safe.locationMaster = {
+      _id: safe.locationRef._id,
+      name: safe.locationRef.name || "",
+      gujaratiName: safe.locationRef.gujaratiName || "",
+      slug: safe.locationRef.slug || "",
+      city: safe.locationRef.city || "",
+      state: safe.locationRef.state || "",
+      locationType: safe.locationRef.locationType || "",
+      isIndexable: Boolean(safe.locationRef.isIndexable),
+      verificationStatus: safe.locationRef.verificationStatus || "needsVerification",
+    };
+    safe.locationRef = safe.locationRef._id;
+  }
   if (safe.description) safe.description = sanitizePublicDescription(safe.description);
   const broker = plainObject(property.broker);
   const map = plainObject(property.map);

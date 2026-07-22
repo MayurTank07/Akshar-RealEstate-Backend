@@ -47,6 +47,33 @@ export const propertyOptionCreateSchema = z.object({
   }),
 });
 
+export const locationCreateSchema = z.object({
+  body: z.object({
+    name: z.string().trim().min(2, "Location name is required").max(120),
+    gujaratiName: z.string().trim().max(120).optional().default(""),
+    slug: z.string().trim().max(140).optional().default(""),
+    city: z.string().trim().max(120).optional().default(""),
+    district: z.string().trim().max(120).optional().default(""),
+    taluka: z.string().trim().max(120).optional().default(""),
+    state: z.string().trim().max(120).optional().default("Gujarat"),
+    country: z.string().trim().max(120).optional().default("India"),
+    pinCode: z.string().trim().max(12).optional().default(""),
+    latitude: z.coerce.number().nullable().optional().default(null),
+    longitude: z.coerce.number().nullable().optional().default(null),
+    parentRegion: z.string().trim().max(120).optional().default(""),
+    locationType: z.enum(["country", "state", "district", "taluka", "city", "region", "locality", "road", "project", "landmark"]).optional().default("locality"),
+    seoTitle: z.string().trim().max(180).optional().default(""),
+    metaDescription: z.string().trim().max(220).optional().default(""),
+    shortDescription: z.string().trim().max(500).optional().default(""),
+    longDescription: z.string().trim().max(3000).optional().default(""),
+    primaryKeyword: z.string().trim().max(160).optional().default(""),
+    secondaryKeywords: z.array(z.string().trim().min(1).max(120)).optional().default([]),
+    isActive: z.coerce.boolean().optional().default(true),
+    isIndexable: z.coerce.boolean().optional().default(false),
+    verificationStatus: z.enum(["verified", "needsVerification"]).optional().default("needsVerification"),
+  }),
+});
+
 export const staffLoginSchema = z.object({
   body: z.object({
     email: z.string().email(),
@@ -122,6 +149,9 @@ export const passwordChangeSchema = z.object({
 export const propertySchema = z.object({
   body: z.object({
     title: z.string().min(2),
+    locationRef: assignableId.optional().nullable(),
+    locationId: assignableId.optional().nullable(),
+    locationSlug: z.string().trim().optional().default(""),
     location: z.string().min(2),
     city: z.string().optional().default(""),
     type: z.string().min(2),

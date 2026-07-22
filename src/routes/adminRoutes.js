@@ -4,6 +4,7 @@ import { updateContent } from "../controllers/contentController.js";
 import { deleteEnquiry, listEnquiries, updateEnquiry } from "../controllers/enquiryController.js";
 import { listNotifications, markAllNotificationsRead, markNotificationRead } from "../controllers/notificationController.js";
 import { deleteOwnerRequest, listOwners, reviewOwnerDeleteRequest, updateOwnerContent, updateOwnerStatus } from "../controllers/ownerController.js";
+import { createLocationHandler, listLocations } from "../controllers/locationController.js";
 import { checkPropertyCode, createProperty, deleteProperty, getProperty, listProperties, nextPropertyCode, updateProperty } from "../controllers/propertyController.js";
 import { createPropertyOption, listPropertyOptions } from "../controllers/propertyOptionController.js";
 import { exportReport, listSoldRentedReports } from "../controllers/reportController.js";
@@ -24,6 +25,7 @@ import {
   idParamSchema,
   ownerStatusSchema,
   propertyOptionCreateSchema,
+  locationCreateSchema,
   propertySchema,
   staffCreateSchema,
   staffUpdateSchema,
@@ -43,6 +45,8 @@ router.put("/notifications/:id/read", authorize("admin", "supervisor"), validate
 router.get("/properties", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.ASSIGNED_VIEW), listProperties);
 router.get("/property-options", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT), listPropertyOptions);
 router.post("/property-options", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT), validate(propertyOptionCreateSchema), createPropertyOption);
+router.get("/locations", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT), listLocations);
+router.post("/locations", authorize("admin"), validate(locationCreateSchema), createLocationHandler);
 router.get("/properties/next-code", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT), nextPropertyCode);
 router.get("/properties/code/:propertyCode/available", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT), checkPropertyCode);
 router.get("/properties/:id", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.ASSIGNED_VIEW), validate(idParamSchema), getProperty);

@@ -6,6 +6,7 @@ import { escapeRegExp } from "../utils/escapeRegExp.js";
 import { parsePagination } from "../utils/pagination.js";
 import { parseINRAmount } from "../utils/reporting.js";
 import { generatePropertyCode, isReadablePropertyCode, previewPropertyCode, syncPropertyCodeCounter } from "../services/propertyCodeService.js";
+import { LOCATION_PUBLIC_FIELDS, recalculateLocationPropertyCounts, resolveLocationInput } from "../services/locationService.js";
 import { publicPropertyView } from "../utils/publicProperty.js";
 import { deleteCloudinaryAssets, mediaAssetsFromProperty, removedCloudinaryAssets } from "../services/cloudinaryMediaService.js";
 
@@ -144,6 +145,10 @@ const listQuery = (query, { includePrivateSearch = true } = {}) => {
     if (query.availability === "rented") filter.status = "rented";
   }
   if (query.city && query.city !== "all") filter.city = new RegExp(escapeRegExp(query.city), "i");
+  if (query.location && query.location !== "all") {
+    const pattern = new RegExp(escapeRegExp(query.location), "i");
+    filter.$and = [...(filter.$and || []), { $or: [{ location: pattern }, { "map.area": pattern }] }];
+  }
   if (query.type && query.type !== "all") filter.type = new RegExp(`^${escapeRegExp(query.type)}$`, "i");
   const category = String(query.category || "").trim();
   const newProjectQuery = [query.isNewProject, query.newProject, query.newProjects].map(booleanQuery).find((value) => value !== null);
@@ -239,6 +244,17 @@ async function cleanupPropertyMedia(assets = []) {
   }
 }
 
+async function applyMasterLocation(body) {
+  const { patch } = await resolveLocationInput(body);
+  body.locationRef = patch.locationRef;
+  body.location = patch.location;
+  body.city = patch.city;
+  body.map = patch.map;
+  delete body.locationId;
+  delete body.locationSlug;
+  return body;
+}
+
 export const publicProperties = asyncHandler(async (req, res) => {
   const filter = listQuery({ ...req.query, status: req.query.status || "active" }, { includePrivateSearch: false });
   filter.visibility = { $ne: "private" };
@@ -247,6 +263,7 @@ export const publicProperties = asyncHandler(async (req, res) => {
     Property.find(filter)
       .populate("assignedTo", "name phone whatsapp designation companyName avatar role")
       .populate("createdBy", "name phone whatsapp designation companyName avatar role")
+      .populate("locationRef", LOCATION_PUBLIC_FIELDS)
       .sort(sort)
       .skip(skip)
       .limit(limit),
@@ -258,7 +275,8 @@ export const publicProperties = asyncHandler(async (req, res) => {
 export const publicProperty = asyncHandler(async (req, res) => {
   const property = await Property.findOne({ _id: req.validated.params.id, status: "active", deletedAt: null, visibility: { $ne: "private" } })
     .populate("assignedTo", "name phone whatsapp designation companyName avatar role")
-    .populate("createdBy", "name phone whatsapp designation companyName avatar role");
+    .populate("createdBy", "name phone whatsapp designation companyName avatar role")
+    .populate("locationRef", LOCATION_PUBLIC_FIELDS);
   if (!property) throw new ApiError(404, "Property not found");
   res.json({ success: true, data: publicPropertyView(property) });
 });
@@ -269,6 +287,7 @@ export const listProperties = asyncHandler(async (req, res) => {
   const [properties, total] = await Promise.all([
     Property.find(filter)
       .populate("assignedTo", "name email phone whatsapp designation companyName avatar role")
+      .populate("locationRef", LOCATION_PUBLIC_FIELDS)
       .sort(sort)
       .skip(skip)
       .limit(limit),
@@ -278,7 +297,9 @@ export const listProperties = asyncHandler(async (req, res) => {
 });
 
 export const getProperty = asyncHandler(async (req, res) => {
-  const property = await Property.findById(req.validated.params.id).populate("assignedTo", "name email phone whatsapp designation companyName avatar role");
+  const property = await Property.findById(req.validated.params.id)
+    .populate("assignedTo", "name email phone whatsapp designation companyName avatar role")
+    .populate("locationRef", LOCATION_PUBLIC_FIELDS);
   if (!property) throw new ApiError(404, "Property not found");
   if (!canAccessProperty(req.user, property)) throw new ApiError(403, "You can only access assigned properties");
   res.json({ success: true, data: property });
@@ -300,6 +321,7 @@ export const checkPropertyCode = asyncHandler(async (req, res) => {
 
 export const createProperty = asyncHandler(async (req, res) => {
   const body = { ...req.validated.body };
+  await applyMasterLocation(body);
   normalizeMoneyFields(body);
   normalizeNewProjectFlag(body);
   if (req.user.role === "supervisor") {
@@ -327,6 +349,7 @@ export const createProperty = asyncHandler(async (req, res) => {
     createdBy: req.user._id,
     updatedBy: req.user._id,
   });
+  await recalculateLocationPropertyCounts();
   await syncPropertyCodeCounter(property.propertyCode);
   await Activity.create({
     type: "Property",
@@ -352,6 +375,7 @@ export const updateProperty = asyncHandler(async (req, res) => {
   const previousMediaAssets = mediaAssetsFromProperty(existing);
 
   const body = normalizeMoneyFields({ ...req.validated.body, updatedBy: req.user._id });
+  await applyMasterLocation(body);
   normalizeNewProjectFlag(body);
   if (req.user.role === "supervisor") {
     delete body.assignedTo;
@@ -382,6 +406,7 @@ export const updateProperty = asyncHandler(async (req, res) => {
 
   Object.assign(existing, body);
   await existing.save();
+  await recalculateLocationPropertyCounts();
   const removedMediaAssets = removedCloudinaryAssets(previousMediaAssets, mediaAssetsFromProperty(existing));
   if (removedMediaAssets.length) {
     await cleanupPropertyMedia(removedMediaAssets);
@@ -428,6 +453,7 @@ export const deleteProperty = asyncHandler(async (req, res) => {
     property.deletedBy = req.user._id;
     property.updatedBy = req.user._id;
     await property.save();
+    await recalculateLocationPropertyCounts();
     await cleanupPropertyMedia(mediaAssetsFromProperty(property));
     await Activity.create({
       type: "Property",
@@ -446,6 +472,7 @@ export const deleteProperty = asyncHandler(async (req, res) => {
   }
   const mediaAssets = mediaAssetsFromProperty(property);
   await property.deleteOne();
+  await recalculateLocationPropertyCounts();
   await cleanupPropertyMedia(mediaAssets);
   await Activity.create({
     type: "Property",

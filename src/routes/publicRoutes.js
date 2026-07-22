@@ -4,6 +4,7 @@ import { listPublicCertifications } from "../controllers/certificationController
 import { createPublicEnquiry } from "../controllers/enquiryController.js";
 import { createOwnerRequest, deleteMyOwnerRequest, listMyOwnerRequests, requestOwnerPropertyDelete, updateMyOwnerRequest } from "../controllers/ownerController.js";
 import { listPropertyOptions } from "../controllers/propertyOptionController.js";
+import { listLocations } from "../controllers/locationController.js";
 import { publicProperties, publicProperty } from "../controllers/propertyController.js";
 import { getOwnerUploadToken, ownerMediaUpload, ownerProofUpload, uploadOwnerMedia, uploadOwnerProofs } from "../controllers/uploadController.js";
 import { authenticateUser } from "../middleware/auth.js";
@@ -15,6 +16,7 @@ const router = Router();
 router.get("/properties", publicProperties);
 router.get("/properties/:id", validate(idParamSchema), publicProperty);
 router.get("/property-options", listPropertyOptions);
+router.get("/locations", listLocations);
 router.post("/enquiries", validate(enquiryCreateSchema), createPublicEnquiry);
 router.get("/content", publicContent);
 router.get("/certifications", listPublicCertifications);

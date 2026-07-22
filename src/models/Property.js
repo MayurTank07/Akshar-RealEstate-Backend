@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 const propertySchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
+    locationRef: { type: mongoose.Schema.Types.ObjectId, ref: "Location", default: null },
     location: { type: String, required: true, trim: true },
     city: { type: String, trim: true, default: "" },
     type: { type: String, required: true, trim: true },
@@ -135,6 +136,7 @@ const propertySchema = new mongoose.Schema(
 );
 
 propertySchema.index({ title: "text", location: "text", city: "text", type: "text", ownerName: "text", ownerSellerName: "text", developerName: "text", topProject: "text", topDeveloper: "text", dealType: "text", propertyCode: "text", status: "text", category: "text", propertyStatus: "text" });
+propertySchema.index({ locationRef: 1, status: 1, deletedAt: 1, visibility: 1 });
 propertySchema.index({ status: 1, statusUpdatedAt: -1, assignedTo: 1, createdBy: 1 });
 propertySchema.index({ isNewProject: 1, status: 1, createdAt: -1 });
 propertySchema.index({ propertyCode: 1 }, { unique: true, partialFilterExpression: { propertyCode: { $type: "string", $gt: "" } } });
