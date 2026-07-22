@@ -7,7 +7,8 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "seed": "node src/seed.js",
-    "seed:locations": "node src/scripts/normalize-property-locations.js"
+    "seed:locations": "node src/scripts/normalize-property-locations.js",
+    "backfill:property-seo": "node src/scripts/backfill-property-seo.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -5,7 +5,7 @@ import { createPublicEnquiry } from "../controllers/enquiryController.js";
 import { createOwnerRequest, deleteMyOwnerRequest, listMyOwnerRequests, requestOwnerPropertyDelete, updateMyOwnerRequest } from "../controllers/ownerController.js";
 import { listPropertyOptions } from "../controllers/propertyOptionController.js";
 import { listLocations } from "../controllers/locationController.js";
-import { publicProperties, publicProperty } from "../controllers/propertyController.js";
+import { publicProperties, publicProperty, publicPropertyBySlug } from "../controllers/propertyController.js";
 import { getOwnerUploadToken, ownerMediaUpload, ownerProofUpload, uploadOwnerMedia, uploadOwnerProofs } from "../controllers/uploadController.js";
 import { authenticateUser } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
@@ -14,6 +14,7 @@ import { enquiryCreateSchema, idParamSchema, ownerDeleteRequestSchema, ownerRequ
 const router = Router();
 
 router.get("/properties", publicProperties);
+router.get("/properties/slug/:slug", publicPropertyBySlug);
 router.get("/properties/:id", validate(idParamSchema), publicProperty);
 router.get("/property-options", listPropertyOptions);
 router.get("/locations", listLocations);

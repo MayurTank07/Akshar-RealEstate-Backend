@@ -187,7 +187,7 @@ async function approveRequest(request, reviewer) {
 
 export const listMyOwnerRequests = asyncHandler(async (req, res) => {
   const requests = await OwnerApplication.find({ ownerUserId: req.ownerUser._id })
-    .populate("approvedPropertyId", "title propertyCode status visibility city location image")
+    .populate("approvedPropertyId", "title slug propertyCode status visibility city location image")
     .sort({ createdAt: -1 });
   res.json({ success: true, data: requests });
 });
@@ -252,7 +252,7 @@ export const updateMyOwnerRequest = asyncHandler(async (req, res) => {
 });
 
 export const deleteMyOwnerRequest = asyncHandler(async (req, res) => {
-  const request = await OwnerApplication.findOne({ _id: req.validated.params.id, ownerUserId: req.ownerUser._id }).populate("approvedPropertyId", "status title");
+  const request = await OwnerApplication.findOne({ _id: req.validated.params.id, ownerUserId: req.ownerUser._id }).populate("approvedPropertyId", "status title slug");
   if (!request) throw new ApiError(404, "Owner property request not found");
   if (request.approvalInProgress) throw new ApiError(409, "This property is currently under approval review. Please try again shortly.");
   if (request.approvedPropertyId?.status === "sold") {
@@ -278,7 +278,7 @@ export const deleteMyOwnerRequest = asyncHandler(async (req, res) => {
 });
 
 export const deleteOwnerRequest = asyncHandler(async (req, res) => {
-  const request = await OwnerApplication.findById(req.validated.params.id).populate("approvedPropertyId", "status title visibility");
+  const request = await OwnerApplication.findById(req.validated.params.id).populate("approvedPropertyId", "status title slug visibility");
   if (!request) throw new ApiError(404, "Owner property request not found");
   if (request.approvalInProgress) throw new ApiError(409, "This property is currently under approval review. Please try again shortly.");
 
@@ -316,7 +316,7 @@ export const deleteOwnerRequest = asyncHandler(async (req, res) => {
 
 export const requestOwnerPropertyDelete = asyncHandler(async (req, res) => {
   const { reason } = req.validated.body;
-  const request = await OwnerApplication.findOne({ _id: req.validated.params.id, ownerUserId: req.ownerUser._id }).populate("approvedPropertyId", "status visibility title");
+  const request = await OwnerApplication.findOne({ _id: req.validated.params.id, ownerUserId: req.ownerUser._id }).populate("approvedPropertyId", "status visibility title slug");
   if (!request) throw new ApiError(404, "Owner property request not found");
   if (request.approvalInProgress) throw new ApiError(409, "This property is currently under approval review. Please try again shortly.");
   if (request.approvedPropertyId?.status === "sold") {
@@ -358,7 +358,7 @@ export const requestOwnerPropertyDelete = asyncHandler(async (req, res) => {
     targets: await ownerManagementTargets(),
   });
 
-  const populated = await OwnerApplication.findById(request._id).populate("approvedPropertyId", "title propertyCode status visibility city location image");
+  const populated = await OwnerApplication.findById(request._id).populate("approvedPropertyId", "title slug propertyCode status visibility city location image");
   res.json({ success: true, data: populated });
 });
 
@@ -387,7 +387,7 @@ export const listOwners = asyncHandler(async (req, res) => {
       .populate("ownerUserId", "name email phone")
       .populate("reviewedBy", "name role phone email designation avatar")
       .populate("deleteReviewedBy", "name role")
-      .populate("approvedPropertyId", "title propertyCode status visibility city location")
+      .populate("approvedPropertyId", "title slug propertyCode status visibility city location")
       .sort(sort)
       .skip(skip)
       .limit(limit),
@@ -446,7 +446,7 @@ export const updateOwnerContent = asyncHandler(async (req, res) => {
     .populate("ownerUserId", "name email phone")
     .populate("reviewedBy", "name role phone email designation avatar")
     .populate("deleteReviewedBy", "name role")
-    .populate("approvedPropertyId", "title propertyCode status visibility city location");
+    .populate("approvedPropertyId", "title slug propertyCode status visibility city location");
   res.json({ success: true, data: populated });
 });
 
@@ -498,7 +498,7 @@ export const updateOwnerStatus = asyncHandler(async (req, res) => {
     .populate("ownerUserId", "name email phone")
     .populate("reviewedBy", "name role phone email designation avatar")
     .populate("deleteReviewedBy", "name role")
-    .populate("approvedPropertyId", "title propertyCode status visibility city location");
+    .populate("approvedPropertyId", "title slug propertyCode status visibility city location");
 
   res.json({ success: true, data: populated });
 });
@@ -553,7 +553,7 @@ export const reviewOwnerDeleteRequest = asyncHandler(async (req, res) => {
     .populate("ownerUserId", "name email phone")
     .populate("reviewedBy", "name role phone email designation avatar")
     .populate("deleteReviewedBy", "name role")
-    .populate("approvedPropertyId", "title propertyCode status visibility city location");
+    .populate("approvedPropertyId", "title slug propertyCode status visibility city location");
 
   res.json({ success: true, data: populated });
 });

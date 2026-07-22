@@ -121,6 +121,33 @@ const propertySchema = new mongoose.Schema(
       metaDescription: { type: String, trim: true, default: "" },
       slug: { type: String, trim: true, default: "" },
     },
+    slug: { type: String, trim: true, lowercase: true, default: "" },
+    seoTitle: { type: String, trim: true, default: "" },
+    metaDescription: { type: String, trim: true, default: "" },
+    canonicalUrl: { type: String, trim: true, default: "" },
+    propertyType: { type: String, trim: true, default: "" },
+    listingType: { type: String, enum: ["", "sale", "rent"], default: "" },
+    bhk: { type: Number, default: 0 },
+    carpetArea: { type: Number, default: 0 },
+    builtUpArea: { type: Number, default: 0 },
+    plotArea: { type: Number, default: 0 },
+    propertyAge: { type: String, trim: true, default: "" },
+    floor: { type: String, trim: true, default: "" },
+    projectName: { type: String, trim: true, default: "" },
+    societyName: { type: String, trim: true, default: "" },
+    address: { type: String, trim: true, default: "" },
+    locationId: { type: mongoose.Schema.Types.ObjectId, ref: "Location", default: null },
+    district: { type: String, trim: true, default: "" },
+    latitude: { type: Number, default: null },
+    longitude: { type: Number, default: null },
+    assignedSupervisor: { type: mongoose.Schema.Types.ObjectId, ref: "Staff", default: null },
+    sellerName: { type: String, trim: true, default: "" },
+    isFeatured: { type: Boolean, default: false },
+    isIndexable: { type: Boolean, default: true },
+    publishedAt: { type: Date, default: null },
+    lastModifiedAt: { type: Date, default: null },
+    images: [{ type: String, trim: true }],
+    imageAltTexts: [{ type: String, trim: true }],
     yearBuilt: { type: Number, default: null },
     propertyCode: { type: String, trim: true, default: "" },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "Staff", default: null },
@@ -140,5 +167,6 @@ propertySchema.index({ locationRef: 1, status: 1, deletedAt: 1, visibility: 1 })
 propertySchema.index({ status: 1, statusUpdatedAt: -1, assignedTo: 1, createdBy: 1 });
 propertySchema.index({ isNewProject: 1, status: 1, createdAt: -1 });
 propertySchema.index({ propertyCode: 1 }, { unique: true, partialFilterExpression: { propertyCode: { $type: "string", $gt: "" } } });
+propertySchema.index({ slug: 1 }, { unique: true, partialFilterExpression: { slug: { $type: "string", $gt: "" } } });
 
 export const Property = mongoose.model("Property", propertySchema);

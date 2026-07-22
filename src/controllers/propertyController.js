@@ -7,6 +7,7 @@ import { parsePagination } from "../utils/pagination.js";
 import { parseINRAmount } from "../utils/reporting.js";
 import { generatePropertyCode, isReadablePropertyCode, previewPropertyCode, syncPropertyCodeCounter } from "../services/propertyCodeService.js";
 import { LOCATION_PUBLIC_FIELDS, recalculateLocationPropertyCounts, resolveLocationInput } from "../services/locationService.js";
+import { applyPropertySeoFields } from "../services/propertySeoService.js";
 import { publicPropertyView } from "../utils/publicProperty.js";
 import { deleteCloudinaryAssets, mediaAssetsFromProperty, removedCloudinaryAssets } from "../services/cloudinaryMediaService.js";
 
@@ -281,6 +282,15 @@ export const publicProperty = asyncHandler(async (req, res) => {
   res.json({ success: true, data: publicPropertyView(property) });
 });
 
+export const publicPropertyBySlug = asyncHandler(async (req, res) => {
+  const property = await Property.findOne({ slug: req.params.slug, status: "active", deletedAt: null, visibility: { $ne: "private" } })
+    .populate("assignedTo", "name phone whatsapp designation companyName avatar role")
+    .populate("createdBy", "name phone whatsapp designation companyName avatar role")
+    .populate("locationRef", LOCATION_PUBLIC_FIELDS);
+  if (!property) throw new ApiError(404, "Property not found");
+  res.json({ success: true, data: publicPropertyView(property) });
+});
+
 export const listProperties = asyncHandler(async (req, res) => {
   const filter = { ...listQuery(req.query), ...supervisorOwnershipFilter(req.user) };
   const { page, limit, skip, sort } = parsePagination(req.query, { allowedSortFields: PROPERTY_SORT_FIELDS });
@@ -344,6 +354,7 @@ export const createProperty = asyncHandler(async (req, res) => {
   } else {
     body.propertyCode = await generatePropertyCode(body.city || body.location);
   }
+  await applyPropertySeoFields(body, { user: req.user });
   const property = await Property.create({
     ...body,
     createdBy: req.user._id,
@@ -403,6 +414,7 @@ export const updateProperty = asyncHandler(async (req, res) => {
     if (duplicate) throw new ApiError(409, "Property ID already exists");
   }
   validateDealDetails(body, existing);
+  await applyPropertySeoFields(body, { existing, user: req.user });
 
   Object.assign(existing, body);
   await existing.save();
