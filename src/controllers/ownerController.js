@@ -1,4 +1,5 @@
 import { PERMISSIONS } from "../config/permissions.js";
+import { DELETED_PROPERTY_STATUS, isDealStatus } from "../config/propertyLifecycle.js";
 import { Activity } from "../models/Activity.js";
 import { OwnerApplication } from "../models/OwnerApplication.js";
 import { Property } from "../models/Property.js";
@@ -285,17 +286,21 @@ export const deleteOwnerRequest = asyncHandler(async (req, res) => {
   const linkedProperty = request.approvedPropertyId ? await Property.findById(request.approvedPropertyId._id) : null;
   let propertyAction = "none";
   if (linkedProperty) {
-    if (["sold", "rented"].includes(linkedProperty.status)) {
-      linkedProperty.visibility = "private";
-      linkedProperty.deletedAt = new Date();
-      linkedProperty.deletedBy = req.user._id;
-      linkedProperty.updatedBy = req.user._id;
-      await linkedProperty.save();
+    linkedProperty.visibility = "private";
+    linkedProperty.deletedAt = new Date();
+    linkedProperty.deletedBy = req.user._id;
+    linkedProperty.updatedBy = req.user._id;
+    linkedProperty.isIndexable = false;
+    linkedProperty.lastModifiedAt = new Date();
+    if (isDealStatus(linkedProperty.status)) {
       propertyAction = "archived";
     } else {
-      await linkedProperty.deleteOne();
+      linkedProperty.status = DELETED_PROPERTY_STATUS;
+      linkedProperty.statusUpdatedAt = linkedProperty.deletedAt;
+      linkedProperty.statusUpdatedBy = req.user._id;
       propertyAction = "deleted";
     }
+    await linkedProperty.save();
   }
 
   await createActivity({
@@ -517,6 +522,8 @@ export const reviewOwnerDeleteRequest = asyncHandler(async (req, res) => {
   if (deleteStatus === "approved") {
     owner.approvedPropertyId.visibility = "private";
     owner.approvedPropertyId.status = "inactive";
+    owner.approvedPropertyId.isIndexable = false;
+    owner.approvedPropertyId.lastModifiedAt = new Date();
     owner.approvedPropertyId.statusUpdatedAt = new Date();
     owner.approvedPropertyId.statusUpdatedBy = req.user._id;
     owner.approvedPropertyId.statusRemarks = remarks || "Owner delete request approved";

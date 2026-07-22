@@ -1,4 +1,5 @@
 import { DEFAULT_SUPERVISOR_PERMISSIONS } from "../config/permissions.js";
+import { PUBLIC_LISTING_STATUSES } from "../config/propertyLifecycle.js";
 import { Activity } from "../models/Activity.js";
 import { Enquiry } from "../models/Enquiry.js";
 import { Property } from "../models/Property.js";
@@ -25,7 +26,7 @@ export const listStaff = asyncHandler(async (_req, res) => {
         $group: {
           _id: { $ifNull: ["$assignedTo", "$createdBy"] },
           propertiesAdded: { $sum: 1 },
-          activeProperties: { $sum: { $cond: [{ $eq: ["$status", "active"] }, 1, 0] } },
+          activeProperties: { $sum: { $cond: [{ $in: ["$status", PUBLIC_LISTING_STATUSES] }, 1, 0] } },
         },
       },
     ]),

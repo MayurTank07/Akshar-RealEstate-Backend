@@ -1,4 +1,5 @@
 import { Property } from "../models/Property.js";
+import { isIndexablePropertyStatus, isNonIndexablePropertyStatus, normalizePropertyStatus } from "../config/propertyLifecycle.js";
 import { ApiError } from "../utils/ApiError.js";
 import { formatINR } from "../utils/formatINR.js";
 import { slugify } from "../utils/slugify.js";
@@ -58,7 +59,10 @@ export async function ensureUniquePropertySlug(baseSlug, excludeId) {
   const cleanBase = slugify(baseSlug);
   let candidate = cleanBase || `property-${Date.now()}`;
   let suffix = 2;
-  while (await Property.exists({ slug: candidate, ...(excludeId ? { _id: { $ne: excludeId } } : {}) })) {
+  while (await Property.exists({
+    $or: [{ slug: candidate }, { oldSlugs: candidate }],
+    ...(excludeId ? { _id: { $ne: excludeId } } : {}),
+  })) {
     candidate = `${cleanBase}-${suffix}`;
     suffix += 1;
   }
@@ -94,12 +98,17 @@ export async function applyPropertySeoFields(body, { existing = null, user = nul
   const isAdmin = user?.role === "admin";
   const existingSeo = existing?.seo || {};
   const existingPublished = existing?.publishedAt || null;
+  body.status = normalizePropertyStatus(body.status || existing?.status || "active");
   const manualSlug = isAdmin ? body.slug || body.seo?.slug : "";
   const currentSlug = existing?.slug || existingSeo.slug || "";
   const canRegenerateSlug = forceSlug || !existing || !currentSlug || (!existingPublished && !currentSlug);
   const baseSlug = manualSlug || (canRegenerateSlug ? buildPropertySlug(body) : currentSlug);
   if (manualSlug) {
-    const duplicate = await Property.exists({ slug: slugify(manualSlug), ...(existing?._id ? { _id: { $ne: existing._id } } : {}) });
+    const cleanManualSlug = slugify(manualSlug);
+    const duplicate = await Property.exists({
+      $or: [{ slug: cleanManualSlug }, { oldSlugs: cleanManualSlug }],
+      ...(existing?._id ? { _id: { $ne: existing._id } } : {}),
+    });
     if (duplicate) throw new ApiError(409, "Property slug already exists");
   }
   const slug = await ensureUniquePropertySlug(baseSlug, existing?._id);
@@ -138,10 +147,12 @@ export async function applyPropertySeoFields(body, { existing = null, user = nul
   body.sellerName = body.sellerName || body.ownerSellerName || body.ownerName || "";
   body.isFeatured = Boolean(body.isFeatured ?? body.featured);
   body.featured = Boolean(body.featured ?? body.isFeatured);
-  body.isIndexable = Boolean(body.locationRef) && (isAdmin ? Boolean(body.isIndexable) : Boolean(existing?.isIndexable ?? body.visibility === "public"));
+  const hasIndexableStatus = isIndexablePropertyStatus(body.status);
+  const forcedNoindex = isNonIndexablePropertyStatus(body.status) || body.visibility === "private";
+  body.isIndexable = Boolean(body.locationRef) && !forcedNoindex && hasIndexableStatus && (isAdmin ? Boolean(body.isIndexable) : Boolean(existing?.isIndexable ?? body.visibility === "public"));
   body.images = images;
   body.imageAltTexts = images.map((_, index) => body.imageAltTexts?.[index] || `${body.title || "Property"} in ${body.location || body.city || "Gujarat"}`);
-  body.publishedAt = body.publishedAt || existing?.publishedAt || (body.status === "active" && body.visibility !== "private" ? new Date() : null);
+  body.publishedAt = body.publishedAt || existing?.publishedAt || (hasIndexableStatus && body.visibility !== "private" ? new Date() : null);
   body.lastModifiedAt = new Date();
   return body;
 }

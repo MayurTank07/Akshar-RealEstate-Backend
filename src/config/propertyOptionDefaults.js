@@ -15,7 +15,7 @@ export const PROPERTY_OPTION_DEFAULTS = {
   projects: ["Gurukrupa Ananatam", "Trump Towers", "Ashapura Skies", "Clinton Heights", "Nathani Heights"],
   propertyTypes: ["Apartments", "Villa", "Bungalow", "Plot", "Office", "Showroom", "Shop", "Warehouse", "Farm House", "Penthouse"],
   dealTypes: ["Sale", "Rent", "Pre-Leased", "Lease", "Resale", "New Launch", "Investment", "ROI"],
-  listingStatuses: ["active", "pending", "inactive", "sold", "rented"],
+  listingStatuses: ["draft", "published", "available", "reserved", "active", "pending", "inactive", "sold", "rented", "deleted"],
   displayTags: ["Featured", "New", "Hot", "Standard"],
   bhk: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
   measurementUnits: ["sqft", "vigha", "acre", "sq-yard", "sq-meter", "guntha", "hectare", "custom"],

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ALL_PERMISSION_VALUES } from "../config/permissions.js";
 import { PROPERTY_OPTION_GROUPS } from "../config/propertyOptionDefaults.js";
+import { normalizePropertyStatus } from "../config/propertyLifecycle.js";
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, "Invalid id");
 const mediaString = z.string().min(1);
@@ -189,7 +190,7 @@ export const propertySchema = z.object({
     tag: z.string().trim().min(1).default("Standard"),
     badge: z.string().optional().default(""),
     badgeColor: z.string().optional().default("bg-blue-600"),
-    status: z.string().trim().min(1, "Listing status is required").transform((value) => value.toLowerCase()).default("active"),
+    status: z.string().trim().min(1, "Listing status is required").transform((value) => normalizePropertyStatus(value)).default("active"),
     propertyStatus: z.string().trim().min(1, "Property status is required").default("Ready"),
     category: z.string().optional().default(""),
     availability: z.string().optional().default(""),

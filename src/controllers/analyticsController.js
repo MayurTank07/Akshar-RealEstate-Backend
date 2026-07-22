@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { PUBLIC_LISTING_STATUSES } from "../config/propertyLifecycle.js";
 import { Activity } from "../models/Activity.js";
 import { AnalyticsEvent } from "../models/AnalyticsEvent.js";
 import { Enquiry } from "../models/Enquiry.js";
@@ -58,7 +59,7 @@ function eventScope(user, query = {}) {
 }
 
 function seoPropertyScope(base = {}) {
-  return { ...base, status: "active", deletedAt: null, visibility: { $ne: "private" } };
+  return { ...base, status: { $in: PUBLIC_LISTING_STATUSES }, deletedAt: null, visibility: { $ne: "private" } };
 }
 
 function eventChartItems(stats, labelKey = "_id") {
@@ -126,7 +127,7 @@ export const dashboard = asyncHandler(async (req, res) => {
   ] = await Promise.all([
     Property.countDocuments(properties),
     Enquiry.countDocuments(enquiries),
-    Property.countDocuments({ ...properties, status: "active" }),
+    Property.countDocuments({ ...properties, status: { $in: PUBLIC_LISTING_STATUSES } }),
     buildSoldRentedRows({}, req.user),
     Staff.countDocuments({ role: "supervisor", status: "active" }),
     OwnerApplication.countDocuments({ status: "pending" }),
@@ -284,7 +285,7 @@ export const analytics = asyncHandler(async (req, res) => {
     Enquiry.countDocuments({ ...enquiries, status: "closed", $or: [{ conversionType: "no-conversion" }, { conversionType: "" }, { conversionType: { $exists: false } }] }),
     Enquiry.countDocuments({ ...enquiries, status: { $ne: "closed" } }),
     Property.countDocuments(properties),
-    Property.countDocuments({ ...properties, status: "active" }),
+    Property.countDocuments({ ...properties, status: { $in: PUBLIC_LISTING_STATUSES } }),
     Enquiry.aggregate([
       { $match: { ...enquiries, createdAt: { $gte: days[0] } } },
       {

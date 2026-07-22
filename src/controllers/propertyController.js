@@ -1,5 +1,13 @@
 import { Activity } from "../models/Activity.js";
 import { Property } from "../models/Property.js";
+import {
+  DEAL_STATUSES,
+  DELETED_PROPERTY_STATUS,
+  PUBLIC_DETAIL_STATUSES,
+  PUBLIC_LISTING_STATUSES,
+  isDealStatus,
+  normalizePropertyStatus,
+} from "../config/propertyLifecycle.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { escapeRegExp } from "../utils/escapeRegExp.js";
@@ -139,11 +147,12 @@ const listQuery = (query, { includePrivateSearch = true } = {}) => {
   const filter = {};
   if (String(query.includeDeleted || "").toLowerCase() !== "true") filter.deletedAt = null;
 
-  if (query.status && query.status !== "all") filter.status = query.status;
+  if (query.status && query.status !== "all") filter.status = normalizePropertyStatus(query.status);
   if (query.availability && query.availability !== "all") {
-    if (query.availability === "available") filter.status = { $nin: ["sold", "rented"] };
-    if (query.availability === "sold") filter.status = "sold";
-    if (query.availability === "rented") filter.status = "rented";
+    const availability = normalizePropertyStatus(query.availability);
+    if (availability === "available") filter.status = { $nin: DEAL_STATUSES };
+    if (availability === "sold") filter.status = "sold";
+    if (availability === "rented") filter.status = "rented";
   }
   if (query.city && query.city !== "all") filter.city = new RegExp(escapeRegExp(query.city), "i");
   if (query.location && query.location !== "all") {
@@ -256,15 +265,52 @@ async function applyMasterLocation(body) {
   return body;
 }
 
+function publicListingStatusFilter(query = {}) {
+  const requestedStatus = normalizePropertyStatus(query.status, "");
+  if (requestedStatus && requestedStatus !== "all" && PUBLIC_LISTING_STATUSES.includes(requestedStatus)) {
+    return requestedStatus;
+  }
+  return { $in: PUBLIC_LISTING_STATUSES };
+}
+
+function publicDetailFilter(extra = {}) {
+  return {
+    ...extra,
+    deletedAt: null,
+    visibility: { $ne: "private" },
+    status: { $in: PUBLIC_DETAIL_STATUSES },
+  };
+}
+
+function propertyPopulate(query) {
+  return query
+    .populate("assignedTo", "name phone whatsapp designation companyName avatar role")
+    .populate("createdBy", "name phone whatsapp designation companyName avatar role")
+    .populate("locationRef", LOCATION_PUBLIC_FIELDS);
+}
+
+async function findDeletedPropertyTombstone(match) {
+  return Property.findOne({
+    $and: [
+      match,
+      {
+        $or: [
+          { deletedAt: { $ne: null } },
+          { status: DELETED_PROPERTY_STATUS },
+        ],
+      },
+    ],
+  }).select("_id slug oldSlugs deletedAt status");
+}
+
 export const publicProperties = asyncHandler(async (req, res) => {
-  const filter = listQuery({ ...req.query, status: req.query.status || "active" }, { includePrivateSearch: false });
+  const filter = listQuery(req.query, { includePrivateSearch: false });
+  filter.status = publicListingStatusFilter(req.query);
+  filter.deletedAt = null;
   filter.visibility = { $ne: "private" };
   const { page, limit, skip, sort } = parsePagination(req.query, { allowedSortFields: PROPERTY_SORT_FIELDS });
   const [properties, total] = await Promise.all([
-    Property.find(filter)
-      .populate("assignedTo", "name phone whatsapp designation companyName avatar role")
-      .populate("createdBy", "name phone whatsapp designation companyName avatar role")
-      .populate("locationRef", LOCATION_PUBLIC_FIELDS)
+    propertyPopulate(Property.find(filter))
       .sort(sort)
       .skip(skip)
       .limit(limit),
@@ -274,20 +320,25 @@ export const publicProperties = asyncHandler(async (req, res) => {
 });
 
 export const publicProperty = asyncHandler(async (req, res) => {
-  const property = await Property.findOne({ _id: req.validated.params.id, status: "active", deletedAt: null, visibility: { $ne: "private" } })
-    .populate("assignedTo", "name phone whatsapp designation companyName avatar role")
-    .populate("createdBy", "name phone whatsapp designation companyName avatar role")
-    .populate("locationRef", LOCATION_PUBLIC_FIELDS);
-  if (!property) throw new ApiError(404, "Property not found");
+  const match = { _id: req.validated.params.id };
+  const property = await propertyPopulate(Property.findOne(publicDetailFilter(match)));
+  if (!property) {
+    const deleted = await findDeletedPropertyTombstone(match);
+    if (deleted) throw new ApiError(410, "Property has been removed");
+    throw new ApiError(404, "Property not found");
+  }
   res.json({ success: true, data: publicPropertyView(property) });
 });
 
 export const publicPropertyBySlug = asyncHandler(async (req, res) => {
-  const property = await Property.findOne({ slug: req.params.slug, status: "active", deletedAt: null, visibility: { $ne: "private" } })
-    .populate("assignedTo", "name phone whatsapp designation companyName avatar role")
-    .populate("createdBy", "name phone whatsapp designation companyName avatar role")
-    .populate("locationRef", LOCATION_PUBLIC_FIELDS);
-  if (!property) throw new ApiError(404, "Property not found");
+  const slug = String(req.params.slug || "").trim().toLowerCase();
+  const match = { $or: [{ slug }, { oldSlugs: slug }] };
+  const property = await propertyPopulate(Property.findOne(publicDetailFilter(match)));
+  if (!property) {
+    const deleted = await findDeletedPropertyTombstone(match);
+    if (deleted) throw new ApiError(410, "Property has been removed");
+    throw new ApiError(404, "Property not found");
+  }
   res.json({ success: true, data: publicPropertyView(property) });
 });
 
@@ -337,8 +388,9 @@ export const createProperty = asyncHandler(async (req, res) => {
   if (req.user.role === "supervisor") {
     body.assignedTo = req.user._id;
   }
+  body.status = normalizePropertyStatus(body.status);
   if (body.dealDate === "") body.dealDate = null;
-  if (body.status === "sold" || body.status === "rented") {
+  if (isDealStatus(body.status)) {
     body.dealSource = body.dealSource || "manual";
     body.statusUpdatedAt = body.dealDate || new Date();
     body.statusUpdatedBy = req.user._id;
@@ -387,6 +439,7 @@ export const updateProperty = asyncHandler(async (req, res) => {
 
   const body = normalizeMoneyFields({ ...req.validated.body, updatedBy: req.user._id });
   await applyMasterLocation(body);
+  body.status = normalizePropertyStatus(body.status || existing.status);
   normalizeNewProjectFlag(body);
   if (req.user.role === "supervisor") {
     delete body.assignedTo;
@@ -396,11 +449,11 @@ export const updateProperty = asyncHandler(async (req, res) => {
     body.statusUpdatedBy = req.user._id;
   }
   if (body.dealDate === "") body.dealDate = null;
-  if ((body.status === "sold" || body.status === "rented") && !body.finalPrice && !existing.finalPrice) {
+  if (isDealStatus(body.status) && !body.finalPrice && !existing.finalPrice) {
     body.finalPriceAmount = body.priceAmount || existing.priceAmount || parseINRAmount(existing.price);
     body.finalPrice = String(body.finalPriceAmount || "");
   }
-  if (body.status === "sold" || body.status === "rented") {
+  if (isDealStatus(body.status)) {
     body.dealSource = body.dealSource || existing.dealSource || "manual";
     body.statusUpdatedAt = body.dealDate || body.statusUpdatedAt || existing.statusUpdatedAt || new Date();
     body.statusUpdatedBy = req.user._id;
@@ -415,6 +468,11 @@ export const updateProperty = asyncHandler(async (req, res) => {
   }
   validateDealDetails(body, existing);
   await applyPropertySeoFields(body, { existing, user: req.user });
+  if (body.slug && body.slug !== existing.slug && existing.slug) {
+    const oldSlugs = new Set([...(existing.oldSlugs || []), existing.slug].filter(Boolean));
+    oldSlugs.delete(body.slug);
+    body.oldSlugs = [...oldSlugs];
+  }
 
   Object.assign(existing, body);
   await existing.save();
@@ -425,13 +483,13 @@ export const updateProperty = asyncHandler(async (req, res) => {
   }
   await syncPropertyCodeCounter(existing.propertyCode);
   const statusChanged = previousStatus !== existing.status;
-  const isDealStatus = ["sold", "rented"].includes(existing.status);
+  const isDeal = isDealStatus(existing.status);
   await Activity.create({
     type: "Property",
-    title: statusChanged ? (isDealStatus ? `Property ${existing.status}` : "Property status updated") : previousAssignedTo !== existing.assignedTo?.toString() ? "Property assigned" : "Property updated",
+    title: statusChanged ? (isDeal ? `Property ${existing.status}` : "Property status updated") : previousAssignedTo !== existing.assignedTo?.toString() ? "Property assigned" : "Property updated",
     description: statusChanged ? `${existing.title} marked ${existing.status}` : existing.title,
-    category: isDealStatus ? existing.status : statusChanged ? "property-status" : "property",
-    priority: isDealStatus ? "high" : statusChanged ? "normal" : "low",
+    category: isDeal ? existing.status : statusChanged ? "property-status" : "property",
+    priority: isDeal ? "high" : statusChanged ? "normal" : "low",
     status: existing.status,
     referenceType: "property",
     referenceId: existing._id,
@@ -458,12 +516,14 @@ export const deleteProperty = asyncHandler(async (req, res) => {
   const property = await Property.findById(req.validated.params.id);
   if (!property) throw new ApiError(404, "Property not found");
   if (!canAccessProperty(req.user, property)) throw new ApiError(403, "You can only delete assigned properties");
-  const shouldArchiveForReports = ["sold", "rented"].includes(property.status);
+  const shouldArchiveForReports = isDealStatus(property.status);
+  property.visibility = "private";
+  property.deletedAt = new Date();
+  property.deletedBy = req.user._id;
+  property.updatedBy = req.user._id;
+  property.isIndexable = false;
+  property.lastModifiedAt = new Date();
   if (shouldArchiveForReports) {
-    property.visibility = "private";
-    property.deletedAt = new Date();
-    property.deletedBy = req.user._id;
-    property.updatedBy = req.user._id;
     await property.save();
     await recalculateLocationPropertyCounts();
     await cleanupPropertyMedia(mediaAssetsFromProperty(property));
@@ -482,10 +542,12 @@ export const deleteProperty = asyncHandler(async (req, res) => {
     });
     return res.json({ success: true, data: { id: property._id, archived: true }, message: "Closed property archived and hidden from listings." });
   }
-  const mediaAssets = mediaAssetsFromProperty(property);
-  await property.deleteOne();
+  property.status = DELETED_PROPERTY_STATUS;
+  property.statusUpdatedAt = property.deletedAt;
+  property.statusUpdatedBy = req.user._id;
+  await property.save();
   await recalculateLocationPropertyCounts();
-  await cleanupPropertyMedia(mediaAssets);
+  await cleanupPropertyMedia(mediaAssetsFromProperty(property));
   await Activity.create({
     type: "Property",
     title: "Property deleted",
@@ -499,5 +561,5 @@ export const deleteProperty = asyncHandler(async (req, res) => {
     actorId: req.user._id,
     targetStaffIds: activityTargets(property.assignedTo, property.createdBy),
   });
-  res.json({ success: true, data: { id: property._id } });
+  res.json({ success: true, data: { id: property._id, deleted: true }, message: "Property deleted and removed from public SEO surfaces." });
 });

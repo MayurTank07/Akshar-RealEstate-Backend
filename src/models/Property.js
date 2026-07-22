@@ -122,6 +122,7 @@ const propertySchema = new mongoose.Schema(
       slug: { type: String, trim: true, default: "" },
     },
     slug: { type: String, trim: true, lowercase: true, default: "" },
+    oldSlugs: [{ type: String, trim: true, lowercase: true }],
     seoTitle: { type: String, trim: true, default: "" },
     metaDescription: { type: String, trim: true, default: "" },
     canonicalUrl: { type: String, trim: true, default: "" },
@@ -168,5 +169,6 @@ propertySchema.index({ status: 1, statusUpdatedAt: -1, assignedTo: 1, createdBy:
 propertySchema.index({ isNewProject: 1, status: 1, createdAt: -1 });
 propertySchema.index({ propertyCode: 1 }, { unique: true, partialFilterExpression: { propertyCode: { $type: "string", $gt: "" } } });
 propertySchema.index({ slug: 1 }, { unique: true, partialFilterExpression: { slug: { $type: "string", $gt: "" } } });
+propertySchema.index({ oldSlugs: 1 });
 
 export const Property = mongoose.model("Property", propertySchema);
