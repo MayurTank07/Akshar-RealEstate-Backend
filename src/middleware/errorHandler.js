@@ -7,7 +7,15 @@ export function notFound(req, _res, next) {
   next(error);
 }
 
-export function errorHandler(error, _req, res, _next) {
+function zodFieldErrors(error) {
+  return error.issues.reduce((acc, issue) => {
+    const path = issue.path.filter((part) => part !== "body" && part !== "params" && part !== "query").join(".") || "request";
+    if (!acc[path]) acc[path] = issue.message;
+    return acc;
+  }, {});
+}
+
+export function errorHandler(error, req, res, _next) {
   if (error.name === "CastError") {
     error.statusCode = 400;
     error.message = "Invalid ID format";
@@ -22,13 +30,17 @@ export function errorHandler(error, _req, res, _next) {
 
   const payload = {
     success: false,
-    message: error instanceof ZodError ? "Validation failed" : error.code === "LIMIT_FILE_SIZE" ? "Image is too large. Maximum allowed size is 15MB per image." : error.type === "entity.too.large" ? "Request is too large. Please upload images through the image uploader." : error.message || "Internal server error",
+    message: error instanceof ZodError && req.originalUrl?.includes("/api/admin/properties") ? "Property validation failed" : error instanceof ZodError ? "Validation failed" : error.code === "LIMIT_FILE_SIZE" ? "Image is too large. Maximum allowed size is 15MB per image." : error.type === "entity.too.large" ? "Request is too large. Please upload images through the image uploader." : error.message || "Internal server error",
   };
 
   if (error instanceof ZodError) {
+    payload.errors = zodFieldErrors(error);
     payload.details = error.flatten();
   } else if (error.details) {
     payload.details = error.details;
+    if (typeof error.details === "object" && !Array.isArray(error.details)) {
+      payload.errors = error.details;
+    }
   }
 
   if (env.nodeEnv !== "production") {
