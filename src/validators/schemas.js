@@ -101,6 +101,34 @@ export const propertyOptionCreateSchema = z.object({
   }),
 });
 
+const formDraftIdentitySchema = {
+  formType: z.string().trim().min(2, "Form type is required").max(80),
+  mode: z.string().trim().min(2, "Draft mode is required").max(40),
+  recordId: z.string().trim().max(120).optional().default("new"),
+};
+
+export const formDraftQuerySchema = z.object({
+  query: z.object({
+    formType: formDraftIdentitySchema.formType,
+    mode: formDraftIdentitySchema.mode,
+    recordId: formDraftIdentitySchema.recordId,
+  }),
+});
+
+export const formDraftListQuerySchema = z.object({
+  query: z.object({
+    formType: z.string().trim().max(80).optional(),
+  }),
+});
+
+export const formDraftSaveSchema = z.object({
+  body: z.object({
+    ...formDraftIdentitySchema,
+    payload: z.record(z.any()).optional().default({}),
+    schemaVersion: z.coerce.number().int().min(1).max(20).optional().default(1),
+  }),
+});
+
 export const locationCreateSchema = z.object({
   body: z.object({
     name: z.string().trim().min(2, "Location name is required").max(120),

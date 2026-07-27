@@ -3,6 +3,7 @@ import { analytics, dashboard } from "../controllers/analyticsController.js";
 import { createBlog, deleteBlog, listAdminBlogs, updateBlog } from "../controllers/blogController.js";
 import { updateContent } from "../controllers/contentController.js";
 import { deleteEnquiry, listEnquiries, updateEnquiry } from "../controllers/enquiryController.js";
+import { deleteFormDraft, getFormDraft, listFormDrafts, upsertFormDraft } from "../controllers/formDraftController.js";
 import { listNotifications, markAllNotificationsRead, markNotificationRead } from "../controllers/notificationController.js";
 import { deleteOwnerRequest, listOwners, reviewOwnerDeleteRequest, updateOwnerContent, updateOwnerStatus } from "../controllers/ownerController.js";
 import { createLocationHandler, listLocations } from "../controllers/locationController.js";
@@ -21,6 +22,9 @@ import {
   certificationUpdateSchema,
   contentUpdateSchema,
   enquiryUpdateSchema,
+  formDraftListQuerySchema,
+  formDraftQuerySchema,
+  formDraftSaveSchema,
   ownerDeleteReviewSchema,
   ownerAdminUpdateSchema,
   blogSchema,
@@ -45,6 +49,10 @@ router.put("/notifications/read-all", authorize("admin", "supervisor"), markAllN
 router.put("/notifications/:id/read", authorize("admin", "supervisor"), validate(idParamSchema), markNotificationRead);
 
 router.get("/properties", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.ASSIGNED_VIEW), listProperties);
+router.get("/form-drafts", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT, PERMISSIONS.LEADS_MANAGE, PERMISSIONS.OWNER_MANAGEMENT), validate(formDraftListQuerySchema), listFormDrafts);
+router.get("/form-drafts/current", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT, PERMISSIONS.LEADS_MANAGE, PERMISSIONS.OWNER_MANAGEMENT), validate(formDraftQuerySchema), getFormDraft);
+router.put("/form-drafts/current", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT, PERMISSIONS.LEADS_MANAGE, PERMISSIONS.OWNER_MANAGEMENT), validate(formDraftSaveSchema), upsertFormDraft);
+router.delete("/form-drafts/current", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT, PERMISSIONS.LEADS_MANAGE, PERMISSIONS.OWNER_MANAGEMENT), validate(formDraftQuerySchema), deleteFormDraft);
 router.get("/property-options", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT), listPropertyOptions);
 router.post("/property-options", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT), validate(propertyOptionCreateSchema), createPropertyOption);
 router.get("/locations", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT), listLocations);
