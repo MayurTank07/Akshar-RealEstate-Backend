@@ -30,7 +30,7 @@ export const aboutContentDefault = {
   mainDescription: "We simplify real estate and build lasting relationships through performance. We connect people to the best residential and commercial opportunities.",
   heroImage: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=2000",
   ownerName: "Hitesh Patel",
-  ownerPhoto: "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=1000",
+  ownerPhoto: "",
   ownerDesignation: "Founder, Akshar Estate The Property HUB",
   ownerBio: "Hitesh Patel leads Akshar Estate The Property HUB with a practical, client-first approach built around verified opportunities, clear advice, and long-term property value across Gujarat.",
   ownerQuote: "Our goal is simple — to make real estate decisions smarter, faster, and more profitable for our clients.",
