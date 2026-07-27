@@ -16,8 +16,61 @@ const mediaAssetSchema = z.object({
 });
 const assignableId = z.union([objectId, z.literal(""), z.null()]).optional().transform((value) => value || null);
 const propertyTextLimit = 1000;
+const maxSupportedInrAmount = 9999999999;
 const propertyDescription = z.string().trim().max(propertyTextLimit, "Property description must be 1000 characters or less");
 const nearbyLandmarksText = z.string().trim().max(propertyTextLimit, "Nearby landmarks must be 1000 characters or less");
+const nullablePositiveNumber = z.preprocess(
+  (value) => (value === "" || value === undefined ? null : value),
+  z.coerce.number().min(0).nullable().optional().default(null)
+);
+const optionalText = (max = 180) => z.string().trim().max(max).optional().default("");
+const bungalowDetailsSchema = z
+  .object({
+    plotArea: nullablePositiveNumber,
+    plotAreaUnit: z.enum(["", "Square Feet", "Square Meter", "Square Yard", "Vaar", "Guntha"]).optional().default(""),
+    plotLength: nullablePositiveNumber,
+    plotWidth: nullablePositiveNumber,
+    plotFacing: z.enum(["", "North", "South", "East", "West", "North-East", "North-West", "South-East", "South-West"]).optional().default(""),
+    cornerPlot: z.coerce.boolean().optional().default(false),
+    openSides: nullablePositiveNumber,
+    totalConstructionArea: nullablePositiveNumber,
+    constructionAreaUnit: z.enum(["", "Square Feet", "Square Meter", "Square Yard", "Vaar", "Guntha"]).optional().default(""),
+    groundFloorConstructionArea: nullablePositiveNumber,
+    firstFloorConstructionArea: nullablePositiveNumber,
+    secondFloorConstructionArea: nullablePositiveNumber,
+    otherFloorConstructionArea: nullablePositiveNumber,
+    numberOfFloors: nullablePositiveNumber,
+    constructionYear: nullablePositiveNumber,
+    propertyAge: optionalText(80),
+    constructionStatus: z.enum(["", "Ready to Move", "Under Construction", "Newly Constructed", "Resale", "Renovation Required"]).optional().default(""),
+    structureType: z.enum(["", "RCC", "Load-Bearing", "Other"]).optional().default(""),
+    bedrooms: nullablePositiveNumber,
+    bathrooms: nullablePositiveNumber,
+    balconies: nullablePositiveNumber,
+    kitchens: nullablePositiveNumber,
+    livingRooms: nullablePositiveNumber,
+    storeRooms: nullablePositiveNumber,
+    servantRoom: z.coerce.boolean().optional().default(false),
+    poojaRoom: z.coerce.boolean().optional().default(false),
+    studyRoom: z.coerce.boolean().optional().default(false),
+    terrace: z.coerce.boolean().optional().default(false),
+    basement: z.coerce.boolean().optional().default(false),
+    garden: z.coerce.boolean().optional().default(false),
+    privateParking: z.coerce.boolean().optional().default(false),
+    carParkingSpaces: nullablePositiveNumber,
+    twoWheelerParkingSpaces: nullablePositiveNumber,
+    furnishingStatus: z.enum(["", "Unfurnished", "Semi-Furnished", "Fully Furnished"]).optional().default(""),
+    waterAvailability: optionalText(120),
+    electricityAvailability: optionalText(120),
+    roadWidth: optionalText(80),
+    boundaryWall: z.coerce.boolean().optional().default(false),
+    gatedProperty: z.coerce.boolean().optional().default(false),
+    municipalApproval: z.coerce.boolean().optional().default(false),
+    loanAvailable: z.coerce.boolean().optional().default(false),
+    additionalConstructionDetails: z.string().trim().max(propertyTextLimit).optional().default(""),
+  })
+  .optional()
+  .default({});
 const ownerProofDocumentSchema = z
   .object({
     documentType: z.enum(["Ownership Proof", "Electricity Bill", "Tax Bill", "Index Copy", "Other"]),
@@ -170,7 +223,7 @@ export const propertySchema = z.object({
     societyName: z.string().optional().default(""),
     topDeveloper: z.string().optional().default(""),
     price: z.string().min(1),
-    priceAmount: z.coerce.number().min(0).optional().default(0),
+    priceAmount: z.coerce.number().min(0).max(maxSupportedInrAmount, "Amount is too large for the supported INR formatter.").optional().default(0),
     priceUnit: z.string().optional().default(""),
     bhk: z.coerce.number().int().min(0).optional().default(0),
     beds: z.coerce.number().int().min(0).default(0),
@@ -266,6 +319,7 @@ export const propertySchema = z.object({
       })
       .optional()
       .default({ address: "", area: "", city: "", state: "", pincode: "", latitude: null, longitude: null, placeId: "", embedUrl: "" }),
+    bungalowDetails: bungalowDetailsSchema,
     seo: z
       .object({
         metaTitle: z.string().optional().default(""),

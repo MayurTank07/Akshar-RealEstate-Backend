@@ -88,6 +88,7 @@ const PUBLIC_PROPERTY_FIELDS = [
   "ageOfProperty",
   "propertyAge",
   "propertyTags",
+  "bungalowDetails",
   "isNewProject",
   "isPreLeased",
   "isBarter",

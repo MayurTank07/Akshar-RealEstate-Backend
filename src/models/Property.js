@@ -1,5 +1,53 @@
 import mongoose from "mongoose";
 
+const bungalowDetailsSchema = new mongoose.Schema(
+  {
+    plotArea: { type: Number, default: null },
+    plotAreaUnit: { type: String, trim: true, default: "" },
+    plotLength: { type: Number, default: null },
+    plotWidth: { type: Number, default: null },
+    plotFacing: { type: String, trim: true, default: "" },
+    cornerPlot: { type: Boolean, default: false },
+    openSides: { type: Number, default: null },
+    totalConstructionArea: { type: Number, default: null },
+    constructionAreaUnit: { type: String, trim: true, default: "" },
+    groundFloorConstructionArea: { type: Number, default: null },
+    firstFloorConstructionArea: { type: Number, default: null },
+    secondFloorConstructionArea: { type: Number, default: null },
+    otherFloorConstructionArea: { type: Number, default: null },
+    numberOfFloors: { type: Number, default: null },
+    constructionYear: { type: Number, default: null },
+    propertyAge: { type: String, trim: true, default: "" },
+    constructionStatus: { type: String, trim: true, default: "" },
+    structureType: { type: String, trim: true, default: "" },
+    bedrooms: { type: Number, default: null },
+    bathrooms: { type: Number, default: null },
+    balconies: { type: Number, default: null },
+    kitchens: { type: Number, default: null },
+    livingRooms: { type: Number, default: null },
+    storeRooms: { type: Number, default: null },
+    servantRoom: { type: Boolean, default: false },
+    poojaRoom: { type: Boolean, default: false },
+    studyRoom: { type: Boolean, default: false },
+    terrace: { type: Boolean, default: false },
+    basement: { type: Boolean, default: false },
+    garden: { type: Boolean, default: false },
+    privateParking: { type: Boolean, default: false },
+    carParkingSpaces: { type: Number, default: null },
+    twoWheelerParkingSpaces: { type: Number, default: null },
+    furnishingStatus: { type: String, trim: true, default: "" },
+    waterAvailability: { type: String, trim: true, default: "" },
+    electricityAvailability: { type: String, trim: true, default: "" },
+    roadWidth: { type: String, trim: true, default: "" },
+    boundaryWall: { type: Boolean, default: false },
+    gatedProperty: { type: Boolean, default: false },
+    municipalApproval: { type: Boolean, default: false },
+    loanAvailable: { type: Boolean, default: false },
+    additionalConstructionDetails: { type: String, trim: true, maxlength: 1000, default: "" },
+  },
+  { _id: false }
+);
+
 const propertySchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
@@ -116,6 +164,7 @@ const propertySchema = new mongoose.Schema(
       placeId: { type: String, trim: true, default: "" },
       embedUrl: { type: String, trim: true, default: "" },
     },
+    bungalowDetails: { type: bungalowDetailsSchema, default: () => ({}) },
     seo: {
       metaTitle: { type: String, trim: true, default: "" },
       metaDescription: { type: String, trim: true, default: "" },

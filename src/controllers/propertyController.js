@@ -20,6 +20,51 @@ import { publicPropertyView } from "../utils/publicProperty.js";
 import { deleteCloudinaryAssets, mediaAssetsFromProperty, removedCloudinaryAssets } from "../services/cloudinaryMediaService.js";
 
 const PROPERTY_SORT_FIELDS = ["createdAt", "updatedAt", "title", "city", "type", "status", "priceAmount"];
+const MAX_SUPPORTED_INR_AMOUNT = 9999999999;
+const EMPTY_BUNGALOW_DETAILS = {
+  plotArea: null,
+  plotAreaUnit: "",
+  plotLength: null,
+  plotWidth: null,
+  plotFacing: "",
+  cornerPlot: false,
+  openSides: null,
+  totalConstructionArea: null,
+  constructionAreaUnit: "",
+  groundFloorConstructionArea: null,
+  firstFloorConstructionArea: null,
+  secondFloorConstructionArea: null,
+  otherFloorConstructionArea: null,
+  numberOfFloors: null,
+  constructionYear: null,
+  propertyAge: "",
+  constructionStatus: "",
+  structureType: "",
+  bedrooms: null,
+  bathrooms: null,
+  balconies: null,
+  kitchens: null,
+  livingRooms: null,
+  storeRooms: null,
+  servantRoom: false,
+  poojaRoom: false,
+  studyRoom: false,
+  terrace: false,
+  basement: false,
+  garden: false,
+  privateParking: false,
+  carParkingSpaces: null,
+  twoWheelerParkingSpaces: null,
+  furnishingStatus: "",
+  waterAvailability: "",
+  electricityAvailability: "",
+  roadWidth: "",
+  boundaryWall: false,
+  gatedProperty: false,
+  municipalApproval: false,
+  loanAvailable: false,
+  additionalConstructionDetails: "",
+};
 
 const searchNumberWords = {
   zero: "0",
@@ -83,6 +128,16 @@ const SEARCH_FIELDS = [
   "facilities",
   "highlights",
   "propertyTags",
+  "bungalowDetails.plotAreaUnit",
+  "bungalowDetails.plotFacing",
+  "bungalowDetails.constructionAreaUnit",
+  "bungalowDetails.constructionStatus",
+  "bungalowDetails.structureType",
+  "bungalowDetails.furnishingStatus",
+  "bungalowDetails.waterAvailability",
+  "bungalowDetails.electricityAvailability",
+  "bungalowDetails.roadWidth",
+  "bungalowDetails.additionalConstructionDetails",
   "measurement.unit",
 ];
 
@@ -208,6 +263,7 @@ function activityTargets(...ids) {
 function normalizeMoneyFields(body) {
   if ("price" in body || "priceAmount" in body) {
     body.priceAmount = body.priceAmount || parseINRAmount(body.price);
+    if (body.priceAmount > MAX_SUPPORTED_INR_AMOUNT) throw new ApiError(422, "Price amount is too large for the supported INR formatter.");
     body.price = String(body.priceAmount || parseINRAmount(body.price) || "");
   }
   if ("finalPrice" in body || "finalPriceAmount" in body) {
@@ -218,6 +274,28 @@ function normalizeMoneyFields(body) {
     body.commissionAmount = body.commissionAmount || parseINRAmount(body.commission);
     body.commission = body.commissionAmount ? String(body.commissionAmount) : "";
   }
+  return body;
+}
+
+function isStandaloneResidentialProperty(body = {}) {
+  const text = [body.type, body.propertyType, body.category, body.title].filter(Boolean).join(" ").toLowerCase().replace(/[_-]+/g, " ");
+  return /\b(bungalow|bunglow|villa|independent house|row house|standalone house|independent home|farm house|farmhouse)\b/.test(text);
+}
+
+function sanitizeBungalowDetails(body) {
+  if (!isStandaloneResidentialProperty(body)) {
+    body.bungalowDetails = { ...EMPTY_BUNGALOW_DETAILS };
+    return body;
+  }
+  body.bungalowDetails = { ...EMPTY_BUNGALOW_DETAILS, ...(body.bungalowDetails || {}) };
+  if (body.bungalowDetails.bedrooms && !body.beds) body.beds = body.bungalowDetails.bedrooms;
+  if (body.bungalowDetails.bathrooms && !body.baths) body.baths = body.bungalowDetails.bathrooms;
+  if (body.bungalowDetails.totalConstructionArea && !body.builtUpArea) body.builtUpArea = body.bungalowDetails.totalConstructionArea;
+  if (body.bungalowDetails.plotArea && !body.plotArea) body.plotArea = body.bungalowDetails.plotArea;
+  if (body.bungalowDetails.furnishingStatus && !body.furnishing) body.furnishing = body.bungalowDetails.furnishingStatus;
+  if (body.bungalowDetails.plotFacing && !body.facing) body.facing = body.bungalowDetails.plotFacing;
+  if (body.bungalowDetails.constructionStatus && !body.constructionStatus) body.constructionStatus = body.bungalowDetails.constructionStatus;
+  if (body.bungalowDetails.propertyAge && !body.propertyAge) body.propertyAge = body.bungalowDetails.propertyAge;
   return body;
 }
 
@@ -384,6 +462,7 @@ export const createProperty = asyncHandler(async (req, res) => {
   const body = { ...req.validated.body };
   await applyMasterLocation(body);
   normalizeMoneyFields(body);
+  sanitizeBungalowDetails(body);
   normalizeNewProjectFlag(body);
   if (req.user.role === "supervisor") {
     body.assignedTo = req.user._id;
@@ -439,6 +518,7 @@ export const updateProperty = asyncHandler(async (req, res) => {
 
   const body = normalizeMoneyFields({ ...req.validated.body, updatedBy: req.user._id });
   await applyMasterLocation(body);
+  sanitizeBungalowDetails(body);
   body.status = normalizePropertyStatus(body.status || existing.status);
   normalizeNewProjectFlag(body);
   if (req.user.role === "supervisor") {
