@@ -8,6 +8,7 @@ import { OwnerApplication } from "../models/OwnerApplication.js";
 import { checkUploadQuota } from "../utils/uploadQuota.js";
 import { cloudinary, deleteCloudinaryAssets, uploadBufferToCloudinary } from "../services/cloudinaryMediaService.js";
 import { slugify } from "../utils/slugify.js";
+import { absoluteUploadUrl, CMS_VIDEO_MAX_BYTES, deleteLocalVideoFile, isAllowedCmsVideoFile, saveLocalVideoFile } from "../utils/localVideoStorage.js";
 
 export const propertyImageUpload = multer({
   storage: multer.memoryStorage(),
@@ -60,6 +61,20 @@ export const ownerProofUpload = multer({
   fileFilter: (_req, file, cb) => {
     if (!isAllowedProofFile(file.mimetype, file.originalname)) {
       return cb(new ApiError(422, "Owner proofs must be JPEG, PNG, or PDF files"));
+    }
+    return cb(null, true);
+  },
+});
+
+export const homeVideoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: CMS_VIDEO_MAX_BYTES,
+    files: 1,
+  },
+  fileFilter: (_req, file, cb) => {
+    if (!file.mimetype?.startsWith("video/") || !isAllowedCmsVideoFile(file.mimetype, file.originalname)) {
+      return cb(new ApiError(422, "Only MP4, WebM, MOV, and M4V video files are allowed"));
     }
     return cb(null, true);
   },
@@ -325,6 +340,36 @@ export const uploadOwnerProofs = asyncHandler(async (req, res) => {
       };
     }),
   });
+});
+
+export const uploadHomeVideo = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    throw new ApiError(422, "Please upload a video file");
+  }
+
+  validateMediaFile(req.file);
+  await scanForViruses(req.file);
+  checkUploadQuota(req.ip || "", req.file.size, 500 * 1024 * 1024);
+
+  const saved = await saveLocalVideoFile(req.file);
+  res.status(201).json({
+    success: true,
+    data: {
+      ...saved,
+      url: absoluteUploadUrl(req, saved.filePath),
+      uploadedAt: new Date().toISOString(),
+    },
+  });
+});
+
+export const deleteHomeVideoUpload = asyncHandler(async (req, res) => {
+  const filePath = req.body?.filePath || req.body?.url || "";
+  if (!filePath) {
+    throw new ApiError(422, "Uploaded video path is required");
+  }
+
+  const deleted = await deleteLocalVideoFile(filePath);
+  res.json({ success: true, data: { deleted } });
 });
 
 function buildUploadToken(folder) {

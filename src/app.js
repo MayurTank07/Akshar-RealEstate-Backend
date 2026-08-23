@@ -8,8 +8,10 @@ import adminRoutes from "./routes/adminRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import publicRoutes from "./routes/publicRoutes.js";
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
+import { LOCAL_VIDEO_UPLOAD_DIR } from "./utils/localVideoStorage.js";
 
 const app = express();
+app.set("trust proxy", 1);
 const corsOptions = {
   origin(origin, callback) {
     if (!origin || env.corsOrigins.includes(origin.replace(/\/$/, ""))) {
@@ -65,6 +67,15 @@ app.use(
 app.get("/health", (_req, res) => {
   res.json({ success: true, status: "ok" });
 });
+
+app.use(
+  "/uploads/videos",
+  express.static(LOCAL_VIDEO_UPLOAD_DIR, {
+    immutable: true,
+    maxAge: "30d",
+    fallthrough: false,
+  })
+);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/public", publicRoutes);

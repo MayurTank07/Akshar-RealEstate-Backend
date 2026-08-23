@@ -2,6 +2,7 @@ import { SiteContent } from "../models/SiteContent.js";
 import { siteContentDefaults } from "../config/siteDefaults.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { deleteLocalVideoFile, localVideoPublicPath } from "../utils/localVideoStorage.js";
 
 function isPlainObject(value) {
   return value && typeof value === "object" && !Array.isArray(value);
@@ -41,6 +42,16 @@ async function ensureDefaultContent() {
   }));
 }
 
+function uploadedHomeVideoPaths(value) {
+  const items = value?.videos?.items;
+  if (!Array.isArray(items)) return new Set();
+  return new Set(
+    items
+      .map((item) => localVideoPublicPath(item?.filePath || item?.url || ""))
+      .filter(Boolean)
+  );
+}
+
 export const publicContent = asyncHandler(async (_req, res) => {
   await ensureDefaultContent();
   const content = await SiteContent.find().sort({ section: 1, key: 1 });
@@ -52,8 +63,19 @@ export const updateContent = asyncHandler(async (req, res) => {
   if (!content) throw new ApiError(404, "Content item not found");
   if (!content.isEditable) throw new ApiError(403, "This content item cannot be edited");
 
+  const staleVideoPaths = [];
+  if (content.key === "homeSectionsContent") {
+    const previousPaths = uploadedHomeVideoPaths(content.value);
+    const nextPaths = uploadedHomeVideoPaths(req.validated.body.value);
+    previousPaths.forEach((filePath) => {
+      if (!nextPaths.has(filePath)) staleVideoPaths.push(filePath);
+    });
+  }
+
   content.value = req.validated.body.value;
   await content.save();
+
+  await Promise.all(staleVideoPaths.map((filePath) => deleteLocalVideoFile(filePath)));
 
   res.json({ success: true, data: content });
 });
