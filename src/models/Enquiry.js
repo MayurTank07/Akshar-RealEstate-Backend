@@ -27,6 +27,14 @@ const enquirySchema = new mongoose.Schema(
     followUpDate: { type: Date, default: null },
     remarks: { type: String, trim: true, default: "" },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "Staff" },
+    emailNotification: {
+      status: { type: String, enum: ["pending", "sent", "failed", "skipped"], default: "pending" },
+      recipientStaffId: { type: mongoose.Schema.Types.ObjectId, ref: "Staff", default: null },
+      fallbackUsed: { type: Boolean, default: false },
+      attemptedAt: { type: Date, default: null },
+      sentAt: { type: Date, default: null },
+      failureReason: { type: String, trim: true, maxlength: 120, default: "" },
+    },
     notes: [
       {
         text: { type: String, required: true, trim: true },

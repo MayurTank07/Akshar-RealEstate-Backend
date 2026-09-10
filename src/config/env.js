@@ -64,6 +64,7 @@ export const env = {
   nodeEnv,
   port: Number(process.env.PORT || 5000),
   portFallback: process.env.PORT_FALLBACK !== "false",
+  siteOrigin: process.env.SITE_ORIGIN || process.env.FRONTEND_URL || "https://www.aksharestate.in",
   mongoUri,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
@@ -72,6 +73,15 @@ export const env = {
     cloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
     apiKey: process.env.CLOUDINARY_API_KEY || "",
     apiSecret: process.env.CLOUDINARY_API_SECRET || "",
+  },
+  smtp: {
+    host: process.env.SMTP_HOST || "",
+    port: Number(process.env.SMTP_PORT || 465),
+    secure: String(process.env.SMTP_SECURE ?? "true").toLowerCase() !== "false",
+    user: process.env.SMTP_USER || "",
+    appPassword: process.env.SMTP_APP_PASSWORD || process.env.SMTP_PASSWORD || "",
+    fromName: process.env.SMTP_FROM_NAME || "Akshar Estate : The Property Hub",
+    fallbackRecipient: process.env.ENQUIRY_FALLBACK_EMAIL || process.env.SMTP_USER || "aksharestate2006@gmail.com",
   },
   corsOrigins: [...new Set([...parseCorsOrigins(process.env.CORS_ORIGIN), ...defaultCorsOrigins])],
 };

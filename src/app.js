@@ -54,6 +54,16 @@ app.use(
   })
 );
 app.use(
+  "/api/public/enquiries",
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: "Too many enquiry requests. Please wait before submitting again." },
+  })
+);
+app.use(
   ["/api/public/owner/uploads", "/api/public/owner/proofs"],
   rateLimit({
     windowMs: 60 * 1000,

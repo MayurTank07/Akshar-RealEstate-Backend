@@ -406,7 +406,7 @@ export const enquiryCreateSchema = z.object({
     type: z.string().optional(),
     propertyTitle: z.string().optional().default(""),
     propertyId: objectId.optional(),
-    message: z.string().optional().default(""),
+    message: z.string().trim().max(1000).optional().default(""),
     source: z.enum(["website", "property-detail", "guest", "admin"]).optional().default("website"),
     status: z.enum(["new", "in-progress", "closed"]).optional().default("new"),
   }),

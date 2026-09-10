@@ -1,6 +1,7 @@
 import { Activity } from "../models/Activity.js";
 import { Enquiry } from "../models/Enquiry.js";
 import { Property } from "../models/Property.js";
+import { sendPropertyEnquiryEmail } from "../services/emailService.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { escapeRegExp } from "../utils/escapeRegExp.js";
@@ -31,12 +32,12 @@ function normalizeEnquiry(body) {
 
 async function findEnquiryProperty(body) {
   if (body.propertyId) {
-    return Property.findById(body.propertyId).select("assignedTo createdBy title city location type price status");
+    return Property.findById(body.propertyId).select("assignedTo assignedSupervisor createdBy title city location area type propertyType price priceAmount status propertyCode slug bhk beds listingType dealType measurement");
   }
 
   if (body.propertyTitle) {
     return Property.findOne({ title: new RegExp(`^${body.propertyTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") }).select(
-      "assignedTo createdBy title city location type price status"
+      "assignedTo assignedSupervisor createdBy title city location area type propertyType price priceAmount status propertyCode slug bhk beds listingType dealType measurement"
     );
   }
 
@@ -118,6 +119,9 @@ async function syncPropertyConversion(enquiry, previousConversionType, actorId) 
 export const createPublicEnquiry = asyncHandler(async (req, res) => {
   const body = normalizeEnquiry(req.validated.body);
   const property = await findEnquiryProperty(body);
+  if (body.propertyId && !property) {
+    throw new ApiError(404, "Property not found for this enquiry");
+  }
 
   if (property) {
     body.assignedTo = property?.assignedTo || property?.createdBy || undefined;
@@ -128,6 +132,7 @@ export const createPublicEnquiry = asyncHandler(async (req, res) => {
   }
 
   const enquiry = await Enquiry.create(body);
+  console.log(`[Enquiry] New enquiry saved: ${enquiry._id}`);
   await Activity.create({
     type: "Enquiry",
     title: "New enquiry",
@@ -147,7 +152,21 @@ export const createPublicEnquiry = asyncHandler(async (req, res) => {
     actorName: enquiry.name,
     targetStaffIds: activityTargets(enquiry.assignedTo),
   });
-  res.status(201).json({ success: true, data: enquiry });
+  if (property) {
+    const emailNotification = await sendPropertyEnquiryEmail({ property, enquiry });
+    enquiry.emailNotification = emailNotification;
+    await enquiry.save();
+  } else {
+    enquiry.emailNotification = {
+      status: "skipped",
+      attemptedAt: new Date(),
+      failureReason: "not_property_enquiry",
+    };
+    await enquiry.save();
+  }
+  const responseData = enquiry.toObject();
+  delete responseData.emailNotification;
+  res.status(201).json({ success: true, data: responseData });
 });
 
 export const listEnquiries = asyncHandler(async (req, res) => {
