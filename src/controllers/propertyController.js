@@ -18,6 +18,7 @@ import { LOCATION_PUBLIC_FIELDS, recalculateLocationPropertyCounts, resolveLocat
 import { applyPropertySeoFields } from "../services/propertySeoService.js";
 import { publicPropertyView } from "../utils/publicProperty.js";
 import { deleteCloudinaryAssets, mediaAssetsFromProperty, removedCloudinaryAssets } from "../services/cloudinaryMediaService.js";
+import { deleteLocalVideoFile, localVideoPublicPath } from "../utils/localVideoStorage.js";
 
 const PROPERTY_SORT_FIELDS = ["createdAt", "updatedAt", "title", "city", "type", "status", "priceAmount"];
 const MAX_SUPPORTED_INR_AMOUNT = 9999999999;
@@ -332,6 +333,16 @@ async function cleanupPropertyMedia(assets = []) {
   }
 }
 
+async function cleanupLocalPropertyVideo(value = "") {
+  const filePath = localVideoPublicPath(value);
+  if (!filePath) return;
+  try {
+    await deleteLocalVideoFile(filePath);
+  } catch (error) {
+    console.warn("Local property video cleanup failed", error?.message || error);
+  }
+}
+
 async function applyMasterLocation(body) {
   const { patch } = await resolveLocationInput(body);
   body.locationRef = patch.locationRef;
@@ -515,6 +526,7 @@ export const updateProperty = asyncHandler(async (req, res) => {
   const previousAssignedTo = existing.assignedTo?.toString();
   const previousStatus = existing.status;
   const previousMediaAssets = mediaAssetsFromProperty(existing);
+  const previousLocalVideoPath = localVideoPublicPath(existing.videoUrl);
 
   const body = normalizeMoneyFields({ ...req.validated.body, updatedBy: req.user._id });
   await applyMasterLocation(body);
@@ -561,6 +573,10 @@ export const updateProperty = asyncHandler(async (req, res) => {
   if (removedMediaAssets.length) {
     await cleanupPropertyMedia(removedMediaAssets);
   }
+  const nextLocalVideoPath = localVideoPublicPath(existing.videoUrl);
+  if (previousLocalVideoPath && previousLocalVideoPath !== nextLocalVideoPath) {
+    await cleanupLocalPropertyVideo(previousLocalVideoPath);
+  }
   await syncPropertyCodeCounter(existing.propertyCode);
   const statusChanged = previousStatus !== existing.status;
   const isDeal = isDealStatus(existing.status);
@@ -597,6 +613,7 @@ export const deleteProperty = asyncHandler(async (req, res) => {
   if (!property) throw new ApiError(404, "Property not found");
   if (!canAccessProperty(req.user, property)) throw new ApiError(403, "You can only delete assigned properties");
   const shouldArchiveForReports = isDealStatus(property.status);
+  const localVideoPath = localVideoPublicPath(property.videoUrl);
   property.visibility = "private";
   property.deletedAt = new Date();
   property.deletedBy = req.user._id;
@@ -607,6 +624,7 @@ export const deleteProperty = asyncHandler(async (req, res) => {
     await property.save();
     await recalculateLocationPropertyCounts();
     await cleanupPropertyMedia(mediaAssetsFromProperty(property));
+    await cleanupLocalPropertyVideo(localVideoPath);
     await Activity.create({
       type: "Property",
       title: "Property archived",
@@ -628,6 +646,7 @@ export const deleteProperty = asyncHandler(async (req, res) => {
   await property.save();
   await recalculateLocationPropertyCounts();
   await cleanupPropertyMedia(mediaAssetsFromProperty(property));
+  await cleanupLocalPropertyVideo(localVideoPath);
   await Activity.create({
     type: "Property",
     title: "Property deleted",

@@ -62,6 +62,8 @@ router.get("/properties/code/:propertyCode/available", authorize("admin", "super
 router.get("/properties/:id", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.ASSIGNED_VIEW), validate(idParamSchema), getProperty);
 router.get("/uploads/token", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT), getAdminUploadToken);
 router.post("/uploads/property-images", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT), propertyImageUpload.array("images", 12), uploadPropertyImages);
+router.post("/uploads/property-video", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT), homeVideoUpload.single("video"), uploadHomeVideo);
+router.delete("/uploads/property-video", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD, PERMISSIONS.PROPERTIES_EDIT), deleteHomeVideoUpload);
 router.post("/uploads/home-video", authorize("admin"), homeVideoUpload.single("video"), uploadHomeVideo);
 router.delete("/uploads/home-video", authorize("admin"), deleteHomeVideoUpload);
 router.post("/properties", authorize("admin", "supervisor"), requirePermission(PERMISSIONS.PROPERTIES_ADD), validate(propertySchema), createProperty);
