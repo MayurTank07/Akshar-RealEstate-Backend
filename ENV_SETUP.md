@@ -101,6 +101,14 @@ In your Render dashboard, add these environment variables:
 | `CLOUDINARY_API_KEY` | Your Cloudinary API key |
 | `CLOUDINARY_API_SECRET` | Your Cloudinary API secret |
 | `CORS_ORIGIN` | `http://127.0.0.1:5173,http://localhost:5173,http://localhost:3000,https://www.aksharestate.in,https://aksharestate.in,https://akshar-real-estate.vercel.app` |
+| `SITE_ORIGIN` | `https://www.aksharestate.in` |
+| `SMTP_HOST` | `smtp.gmail.com` |
+| `SMTP_PORT` | `465` |
+| `SMTP_SECURE` | `true` |
+| `SMTP_USER` | Your Gmail sender address |
+| `SMTP_APP_PASSWORD` | Your Google App Password |
+| `SMTP_FROM_NAME` | `Akshar Estate : The Property Hub` |
+| `ENQUIRY_FALLBACK_EMAIL` | Email address that should receive fallback enquiry notifications |
 
 ### Render Deployment Steps
 
