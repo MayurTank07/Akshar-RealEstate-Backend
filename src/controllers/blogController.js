@@ -25,6 +25,7 @@ function publicBlogFilter(extra = {}) {
     isIndexable: true,
     deletedAt: null,
     publishedAt: { $ne: null, $lte: new Date() },
+    body: { $not: /^\s*this draft is intended for the akshar estate content team\b/i },
     ...extra,
   };
 }
